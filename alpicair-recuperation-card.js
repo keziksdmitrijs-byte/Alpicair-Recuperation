@@ -278,12 +278,273 @@ function rcBindPressActions(el, { onTap, onHold, holdTimeMs = 500 }) {
 }
 
 /* ----------------------------------------------------------------------- */
+/*  Visual editor helpers                                                  */
+/*  Home Assistant's own <ha-form> (with its selector types: entity,       */
+/*  select, ui_action, text…) is reused here instead of hand-rolling a     */
+/*  form, so the editor looks and behaves exactly like HA's built-in ones. */
+/* ----------------------------------------------------------------------- */
+
+let _rcHaFormLoading = null;
+
+/**
+ * <ha-form> is defined lazily by the HA frontend. Forcing a stock card's
+ * config element to load pulls in ha-form + all its selectors as a
+ * side-effect. Safe to call repeatedly — it resolves instantly once loaded.
+ */
+function rcEnsureHaForm() {
+  if (customElements.get("ha-form")) return Promise.resolve();
+  if (_rcHaFormLoading) return _rcHaFormLoading;
+  _rcHaFormLoading = (async () => {
+    try {
+      if (typeof window.loadCardHelpers === "function") {
+        const helpers = await window.loadCardHelpers();
+        if (helpers && helpers.createCardElement) {
+          const el = await helpers.createCardElement({ type: "entities", entities: [] });
+          if (el && el.constructor && el.constructor.getConfigElement) {
+            await el.constructor.getConfigElement();
+          }
+        }
+      }
+    } catch (err) {
+      console.warn("[alpicair-recuperation-card] could not preload ha-form", err);
+    }
+  })();
+  return _rcHaFormLoading;
+}
+
+/**
+ * Small base class shared by both card editors: waits for ha-form, then
+ * renders a single <ha-form> bound to schema()/data()/computeLabel(),
+ * and forwards value-changed as a standard "config-changed" event.
+ */
+class RcEditorBase extends HTMLElement {
+  setConfig(config) {
+    this._config = config || {};
+    this._renderWhenReady();
+  }
+
+  set hass(hass) {
+    this._hass = hass;
+    if (this._form) this._form.hass = hass;
+  }
+
+  connectedCallback() {
+    this._renderWhenReady();
+  }
+
+  _renderWhenReady() {
+    if (!this._config) return;
+    if (!customElements.get("ha-form")) {
+      this.innerHTML = `<div style="padding:12px;font-size:13px;opacity:.7;">Loading editor…</div>`;
+      rcEnsureHaForm().then(() => this._renderWhenReady());
+      return;
+    }
+    this._renderForm();
+  }
+
+  _renderForm() {
+    this.innerHTML = "";
+    const form = document.createElement("ha-form");
+    form.hass = this._hass;
+    form.data = this.formData();
+    form.schema = this.formSchema();
+    form.computeLabel = (schema) => this.computeLabel(schema);
+    form.addEventListener("value-changed", (ev) => {
+      ev.stopPropagation();
+      this._config = { ...this._config, ...ev.detail.value };
+      rcFireEvent(this, "config-changed", { config: this._config });
+    });
+    this._form = form;
+    this.appendChild(form);
+  }
+}
+
+const RC_UI_ACTION_FIELDS = [
+  "navigate",
+  "url",
+  "call-service",
+  "more-info",
+  "none",
+];
+
+class AlpicairRecuperationCardEditor extends RcEditorBase {
+  formData() {
+    return {
+      title: this._config.title || "",
+      mode_entity: this._config.mode_entity || "",
+      fan_speed_entity: this._config.fan_speed_entity || "",
+      recuperation_entity: this._config.recuperation_entity || "",
+      temp_indoor_entity: this._config.temp_indoor_entity || "",
+      temp_outdoor_entity: this._config.temp_outdoor_entity || "",
+      temp_supply_entity: this._config.temp_supply_entity || "",
+      mode_service: this._config.mode_service || "select.select_option",
+      mode_service_data_key: this._config.mode_service_data_key || "option",
+      mode_map: {
+        off: "Off",
+        building_protection: "Building protection",
+        economy: "Economy",
+        comfort: "Comfort",
+        boost: "Boost",
+        ...(this._config.mode_map || {}),
+      },
+      settings_tap_action: this._config.settings_tap_action || { action: "none" },
+      settings_hold_action: this._config.settings_hold_action || { action: "none" },
+      language: this._config.language || "auto",
+      theme: this._config.theme || "auto",
+    };
+  }
+
+  formSchema() {
+    return [
+      { name: "title", selector: { text: {} } },
+      {
+        type: "grid",
+        name: "",
+        schema: [
+          { name: "mode_entity", selector: { entity: {} } },
+          { name: "fan_speed_entity", selector: { entity: { domain: "sensor" } } },
+          { name: "recuperation_entity", selector: { entity: { domain: "sensor" } } },
+          { name: "temp_indoor_entity", selector: { entity: { domain: "sensor" } } },
+          { name: "temp_outdoor_entity", selector: { entity: { domain: "sensor" } } },
+          { name: "temp_supply_entity", selector: { entity: { domain: "sensor" } } },
+        ],
+      },
+      {
+        type: "expandable",
+        name: "mode_service_group",
+        title: "Mode switching",
+        flatten: true,
+        schema: [
+          { name: "mode_service", selector: { text: {} } },
+          { name: "mode_service_data_key", selector: { text: {} } },
+          {
+            type: "expandable",
+            name: "mode_map",
+            title: "Raw option values per mode",
+            schema: [
+              { name: "off", selector: { text: {} } },
+              { name: "building_protection", selector: { text: {} } },
+              { name: "economy", selector: { text: {} } },
+              { name: "comfort", selector: { text: {} } },
+              { name: "boost", selector: { text: {} } },
+            ],
+          },
+        ],
+      },
+      {
+        type: "expandable",
+        name: "settings_button_group",
+        title: "Settings button behaviour",
+        flatten: true,
+        schema: [
+          { name: "settings_tap_action", selector: { ui_action: {} } },
+          { name: "settings_hold_action", selector: { ui_action: {} } },
+        ],
+      },
+      {
+        type: "grid",
+        name: "",
+        schema: [
+          {
+            name: "language",
+            selector: {
+              select: {
+                mode: "dropdown",
+                options: [
+                  { value: "auto", label: "Auto (from settings card)" },
+                  { value: "en", label: "English" },
+                  { value: "ru", label: "Русский" },
+                  { value: "lv", label: "Latviešu" },
+                ],
+              },
+            },
+          },
+          {
+            name: "theme",
+            selector: {
+              select: {
+                mode: "dropdown",
+                options: [
+                  { value: "auto", label: "Match Home Assistant" },
+                  { value: "light", label: "Light" },
+                  { value: "dark", label: "Dark" },
+                ],
+              },
+            },
+          },
+        ],
+      },
+    ];
+  }
+
+  computeLabel(schema) {
+    const labels = {
+      title: "Card title",
+      mode_entity: "Mode entity",
+      fan_speed_entity: "Fan speed sensor (%)",
+      recuperation_entity: "Recuperation sensor (%)",
+      temp_indoor_entity: "Indoor temperature sensor",
+      temp_outdoor_entity: "Outdoor temperature sensor",
+      temp_supply_entity: "Supply air temperature sensor",
+      mode_service: "Service to call (domain.service)",
+      mode_service_data_key: "Service data key for the option",
+      mode_map: "Raw option values per mode",
+      off: "Off",
+      building_protection: "Building protection",
+      economy: "Economy",
+      comfort: "Comfort",
+      boost: "Boost",
+      settings_tap_action: "Tap",
+      settings_hold_action: "Hold",
+      language: "Language",
+      theme: "Appearance",
+    };
+    return labels[schema.name] || schema.name;
+  }
+}
+
+class AlpicairRecuperationCardSettingsEditor extends RcEditorBase {
+  formData() {
+    return {
+      back_tap_action: this._config.back_tap_action || { action: "none" },
+      back_hold_action: this._config.back_hold_action || { action: "none" },
+    };
+  }
+
+  formSchema() {
+    return [
+      {
+        type: "expandable",
+        name: "back_button_group",
+        title: "Back button behaviour",
+        flatten: true,
+        schema: [
+          { name: "back_tap_action", selector: { ui_action: {} } },
+          { name: "back_hold_action", selector: { ui_action: {} } },
+        ],
+      },
+    ];
+  }
+
+  computeLabel(schema) {
+    const labels = {
+      back_tap_action: "Tap",
+      back_hold_action: "Hold",
+    };
+    return labels[schema.name] || schema.name;
+  }
+}
+
+customElements.define("alpicair-recuperation-card-editor", AlpicairRecuperationCardEditor);
+customElements.define("alpicair-recuperation-card-settings-editor", AlpicairRecuperationCardSettingsEditor);
+
+/* ----------------------------------------------------------------------- */
 /*  <alpicair-recuperation-card>                                            */
 /* ----------------------------------------------------------------------- */
 
 class AlpicairRecuperationCard extends HTMLElement {
   static getConfigElement() {
-    return null; // no visual editor yet — configure via YAML
+    return document.createElement("alpicair-recuperation-card-editor");
   }
 
   static getStubConfig() {
@@ -654,6 +915,10 @@ class AlpicairRecuperationCard extends HTMLElement {
 /* ----------------------------------------------------------------------- */
 
 class AlpicairRecuperationCardSettings extends HTMLElement {
+  static getConfigElement() {
+    return document.createElement("alpicair-recuperation-card-settings-editor");
+  }
+
   static getStubConfig() {
     return {
       type: "custom:alpicair-recuperation-card-settings",

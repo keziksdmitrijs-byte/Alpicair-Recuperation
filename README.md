@@ -14,6 +14,10 @@ ventilation recuperator (HRV/ERV) in Home Assistant.
   for short/long press), where the user picks:
   - **Language:** Latviešu / Русский / English
   - **Appearance:** Light / Dark / Match Home Assistant
+- A **visual (UI) editor** for both cards — add them from the dashboard's
+  "Add card" dialog and configure entities, mode mapping, and tap/hold
+  actions with Home Assistant's native form controls. YAML is still
+  supported and always available via "Edit in YAML".
 
 No build step, no dependencies — a single JS file.
 
@@ -40,6 +44,19 @@ No build step, no dependencies — a single JS file.
 2. In **Settings → Dashboards → Resources**, add:
    - URL: `/local/alpicair-recuperation-card.js`
    - Type: JavaScript module
+
+## Using the visual editor
+
+1. Open a dashboard in edit mode → **Add card** → search for
+   "Alpicair Recuperation".
+2. Pick entities, the mode-switching service, per-mode raw values, and the
+   settings button's tap/hold actions in the form.
+3. Add the settings card the same way and set its back button's tap/hold
+   actions.
+
+You can switch to **Edit in YAML** at any point (top-right menu of the
+card editor) — both editors write the same config keys documented below,
+so YAML and UI editing are fully interchangeable.
 
 ## Setting up your entities
 
