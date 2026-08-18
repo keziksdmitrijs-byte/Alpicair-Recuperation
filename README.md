@@ -4,8 +4,11 @@ A modern, friendly Lovelace card for controlling an Alpicair home
 ventilation recuperator (HRV/ERV) in Home Assistant.
 
 - 5 modes: **Off · Building protection · Economy · Comfort · Boost**
-- A dual "breathing ring" gauge showing **fan speed %** and **recuperation %**
-  side by side, with a subtle animation while running
+- A dual progress bar showing **fan speed %** and **recuperation %**, with
+  a subtle pulse while the unit is running — compact and easy to read at a
+  glance
+- Mode buttons laid out as a **2-row grid** (3 + 2) instead of a scrolling
+  row, so every mode is visible without swiping
 - Indoor / outdoor / supply air temperatures (exhaust temperature is
   intentionally left out)
 - A settings button whose **short press** and **long press** actions you
@@ -60,13 +63,15 @@ so YAML and UI editing are fully interchangeable.
 
 ## Layouts for NSPanel
 
-Both cards support a `layout` option:
+Both cards support a `layout` option. Both are stacked vertically (top to
+bottom) — the difference is spacing and density, not orientation:
 
-- **`square`** (default) — a tall, centered layout for square-ish panels
-  like **Sonoff NSPanel Pro**: ring on top, mode pills and stats below.
-- **`wide`** — a compact, landscape layout for elongated panels like
-  **Sonoff NSPanel Pro 120**: ring on the left, modes and stats on the
-  right, everything shorter so it fits the panel's limited height.
+- **`square`** (default) — for panels closer to 1:1, like **Sonoff
+  NSPanel Pro**: comfortable spacing throughout.
+- **`wide`** — for tall, narrow panels like **Sonoff NSPanel Pro 120**:
+  tighter padding and the temperature tiles switch from a 3-column grid
+  to a single stacked column (label left, value right) so they stay
+  legible on a narrow screen.
 
 Fonts and touch targets are already sized generously for small in-wall
 displays (larger than a typical dashboard card) in both layouts, so no

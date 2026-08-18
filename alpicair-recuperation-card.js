@@ -621,7 +621,7 @@ class AlpicairRecuperationCard extends HTMLElement {
   }
 
   getCardSize() {
-    return this._config && this._config.layout === "wide" ? 3 : 5;
+    return this._config && this._config.layout === "wide" ? 4 : 4;
   }
 
   connectedCallback() {
@@ -653,24 +653,41 @@ class AlpicairRecuperationCard extends HTMLElement {
     if (!this._config) return;
     this._built = true;
 
-    const root = document.createElement("div");
     this.innerHTML = "";
     this.attachShadow({ mode: "open" });
 
     const style = document.createElement("style");
     style.textContent = RC_STYLES + `
       .rc-header {
-        display: flex; align-items: center; justify-content: space-between;
-        margin-bottom: 10px;
+        display: flex; align-items: center; gap: 12px;
+        margin-bottom: 16px;
       }
+      .rc-mode-badge {
+        flex: 0 0 auto; width: 46px; height: 46px; border-radius: 14px;
+        display: flex; align-items: center; justify-content: center;
+        background: var(--rc-surface-2); transition: background var(--rc-transition);
+      }
+      .rc-mode-badge.rc-breathing { animation: rc-breathe 3.6s ease-in-out infinite; }
+      @keyframes rc-breathe {
+        0%, 100% { transform: scale(1); }
+        50% { transform: scale(1.08); }
+      }
+      .rc-mode-badge ha-icon { --mdc-icon-size: 24px; transition: color var(--rc-transition); }
+      .rc-header-text { flex: 1 1 auto; min-width: 0; }
       .rc-title {
         font-size: 19px; font-weight: 700; letter-spacing: -0.01em;
       }
       .rc-status {
-        font-size: 13px; color: var(--rc-muted); margin-top: 2px;
+        display: flex; align-items: center; gap: 6px;
+        font-size: 14px; color: var(--rc-muted); margin-top: 2px; font-weight: 600;
       }
+      .rc-status-dot {
+        width: 8px; height: 8px; border-radius: 50%; background: var(--rc-muted);
+        transition: background var(--rc-transition);
+      }
+      .rc-status-dot.rc-on { background: #4ADE80; box-shadow: 0 0 0 3px rgba(74,222,128,0.18); }
       .rc-gear {
-        width: 46px; height: 46px; border-radius: 14px;
+        flex: 0 0 auto; width: 46px; height: 46px; border-radius: 14px;
         display: flex; align-items: center; justify-content: center;
         background: var(--rc-surface-2); cursor: pointer;
         transition: transform var(--rc-transition), background var(--rc-transition);
@@ -680,49 +697,43 @@ class AlpicairRecuperationCard extends HTMLElement {
       .rc-gear:active { transform: rotate(45deg) scale(0.94); }
       .rc-gear ha-icon { color: var(--rc-muted); --mdc-icon-size: 24px; }
 
-      .rc-ring-wrap {
-        position: relative; width: 168px; height: 168px; margin: 6px auto 14px;
-        transition: width 160ms, height 160ms;
+      /* --- bars (fan speed / recuperation), replace the old ring gauges --- */
+      .rc-bars { display: flex; flex-direction: column; gap: 12px; margin-bottom: 16px; }
+      .rc-bar-row { display: flex; flex-direction: column; gap: 6px; }
+      .rc-bar-top { display: flex; align-items: baseline; justify-content: space-between; }
+      .rc-bar-label { display: flex; align-items: center; gap: 7px; font-size: 13px; color: var(--rc-muted); font-weight: 600; }
+      .rc-bar-dot { width: 9px; height: 9px; border-radius: 50%; flex: 0 0 auto; }
+      .rc-bar-value { font-size: 16px; font-weight: 700; font-variant-numeric: tabular-nums; color: var(--rc-text); }
+      .rc-bar-track {
+        position: relative; width: 100%; height: 14px; border-radius: 999px;
+        background: var(--rc-surface-2); overflow: hidden;
       }
-      .rc-ring-wrap svg { width: 100%; height: 100%; display: block; }
-      .rc-ring-wrap.rc-breathing { animation: rc-breathe 4s ease-in-out infinite; }
-      @keyframes rc-breathe {
-        0%, 100% { transform: scale(1); }
-        50% { transform: scale(1.018); }
+      .rc-bar-fill {
+        position: absolute; inset: 0 auto 0 0; height: 100%; width: 0%;
+        border-radius: 999px; transition: width 420ms cubic-bezier(.4,0,.2,1);
       }
-      .rc-ring-center {
-        position: absolute; inset: 0; display: flex; flex-direction: column;
-        align-items: center; justify-content: center; text-align: center;
+      .rc-bar-fill.rc-bar-warm { background: linear-gradient(90deg, var(--rc-accent-warm), #FBCB8A); }
+      .rc-bar-fill.rc-bar-cool { background: linear-gradient(90deg, var(--rc-accent-cool), #8BE7DD); }
+      .rc-bar-fill.rc-breathing { animation: rc-bar-pulse 2.4s ease-in-out infinite; }
+      @keyframes rc-bar-pulse {
+        0%, 100% { filter: brightness(1); }
+        50% { filter: brightness(1.18); }
       }
-      .rc-ring-center ha-icon {
-        --mdc-icon-size: 30px; margin-bottom: 5px;
-        transition: color var(--rc-transition);
-      }
-      .rc-mode-name { font-size: 16px; font-weight: 700; }
-      .rc-mode-sub { font-size: 12px; color: var(--rc-muted); margin-top: 2px; }
-
-      .rc-legend {
-        display: flex; justify-content: center; gap: 20px; margin-bottom: 0;
-      }
-      .rc-legend-item { display: flex; align-items: center; gap: 7px; font-size: 13px; color: var(--rc-muted); }
-      .rc-legend-dot { width: 10px; height: 10px; border-radius: 50%; }
-      .rc-legend-value { font-weight: 700; font-size: 15px; font-variant-numeric: tabular-nums; color: var(--rc-text); }
 
       .rc-modes {
-        display: flex; gap: 8px; overflow-x: auto; padding-bottom: 4px; margin-bottom: 0;
-        scrollbar-width: none;
+        display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px;
+        margin-bottom: 16px;
       }
-      .rc-modes::-webkit-scrollbar { display: none; }
       .rc-mode-btn {
-        flex: 0 0 auto; display: flex; flex-direction: column; align-items: center; gap: 5px;
-        padding: 10px 12px 9px; border-radius: 14px; background: var(--rc-surface);
-        border: 1px solid var(--rc-border); cursor: pointer; min-width: 66px;
+        display: flex; flex-direction: column; align-items: center; gap: 5px;
+        padding: 10px 6px 9px; border-radius: 14px; background: var(--rc-surface);
+        border: 1px solid var(--rc-border); cursor: pointer;
         transition: box-shadow var(--rc-transition), border-color var(--rc-transition), transform 120ms;
         outline: none;
       }
       .rc-mode-btn:active { transform: scale(0.96); }
       .rc-mode-btn ha-icon { --mdc-icon-size: 22px; color: var(--rc-muted); }
-      .rc-mode-btn span { font-size: 11.5px; color: var(--rc-muted); font-weight: 600; }
+      .rc-mode-btn span { font-size: 11.5px; color: var(--rc-muted); font-weight: 600; text-align: center; }
       .rc-mode-btn.active {
         border-color: var(--rc-accent); box-shadow: 0 0 0 1px var(--rc-accent), 0 6px 16px -6px var(--rc-accent);
       }
@@ -738,34 +749,26 @@ class AlpicairRecuperationCard extends HTMLElement {
       .rc-stat-label { font-size: 11px; color: var(--rc-muted); font-weight: 600; text-transform: uppercase; letter-spacing: .03em; }
       .rc-stat-value { font-size: 20px; font-weight: 700; font-variant-numeric: tabular-nums; margin-top: 3px; }
 
-      /* --- Layout: square (default, e.g. NSPanel Pro) --------------------- */
-      .rc-body { display: flex; flex-direction: column; }
-      .rc-left { display: flex; flex-direction: column; align-items: center; }
-      .rc-right { display: flex; flex-direction: column; gap: 14px; margin-top: 14px; }
+      /* --- Layout: square (default, e.g. NSPanel Pro, ~1:1 screen) -------- */
+      /* Vertical stack, comfortably spaced. This is the base layout above. */
 
-      /* --- Layout: wide (e.g. NSPanel Pro 120, landscape strip) ----------- */
-      :host([data-rc-layout="wide"]) .rc-card { padding: 14px 20px; }
-      :host([data-rc-layout="wide"]) .rc-header { margin-bottom: 8px; }
-      :host([data-rc-layout="wide"]) .rc-body {
-        flex-direction: row; align-items: center; gap: 22px;
+      /* --- Layout: wide (e.g. NSPanel Pro 120, tall/narrow strip screen) --
+         Still stacked vertically (the panel itself is portrait-shaped and
+         narrow), just tightened up so everything fits a smaller width. --- */
+      :host([data-rc-layout="wide"]) .rc-card { padding: 14px 14px 16px; }
+      :host([data-rc-layout="wide"]) .rc-header { margin-bottom: 12px; }
+      :host([data-rc-layout="wide"]) .rc-bars { margin-bottom: 14px; gap: 10px; }
+      :host([data-rc-layout="wide"]) .rc-modes { margin-bottom: 14px; gap: 6px; }
+      :host([data-rc-layout="wide"]) .rc-mode-btn { padding: 9px 4px 8px; }
+      :host([data-rc-layout="wide"]) .rc-mode-btn span { font-size: 11px; }
+      :host([data-rc-layout="wide"]) .rc-stats {
+        grid-template-columns: 1fr; gap: 6px;
       }
-      :host([data-rc-layout="wide"]) .rc-left {
-        flex: 0 0 auto; gap: 10px;
+      :host([data-rc-layout="wide"]) .rc-stat {
+        display: flex; align-items: center; justify-content: space-between;
+        text-align: left; padding: 10px 12px;
       }
-      :host([data-rc-layout="wide"]) .rc-ring-wrap {
-        width: 128px; height: 128px; margin: 0;
-      }
-      :host([data-rc-layout="wide"]) .rc-mode-name { font-size: 15px; }
-      :host([data-rc-layout="wide"]) .rc-mode-sub { font-size: 11px; }
-      :host([data-rc-layout="wide"]) .rc-ring-center ha-icon { --mdc-icon-size: 24px; margin-bottom: 3px; }
-      :host([data-rc-layout="wide"]) .rc-legend { flex-direction: column; gap: 6px; align-items: flex-start; }
-      :host([data-rc-layout="wide"]) .rc-right {
-        flex: 1 1 auto; min-width: 0; margin-top: 0; gap: 12px;
-      }
-      :host([data-rc-layout="wide"]) .rc-stats { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
-      :host([data-rc-layout="wide"]) .rc-stat { padding: 9px 6px; }
-      :host([data-rc-layout="wide"]) .rc-stat-value { font-size: 18px; }
-      :host([data-rc-layout="wide"]) .rc-mode-btn { min-width: 58px; padding: 8px 10px 7px; }
+      :host([data-rc-layout="wide"]) .rc-stat-value { margin-top: 0; }
     `;
 
     const card = document.createElement("div");
@@ -773,52 +776,47 @@ class AlpicairRecuperationCard extends HTMLElement {
 
     card.innerHTML = `
       <div class="rc-header">
-        <div>
+        <div class="rc-mode-badge" id="rc-mode-badge">
+          <ha-icon id="rc-mode-icon" icon="mdi:power"></ha-icon>
+        </div>
+        <div class="rc-header-text">
           <div class="rc-title" id="rc-title"></div>
-          <div class="rc-status" id="rc-status"></div>
+          <div class="rc-status">
+            <span class="rc-status-dot" id="rc-status-dot"></span>
+            <span id="rc-status-text"></span>
+          </div>
         </div>
         <div class="rc-gear" id="rc-gear" tabindex="0" role="button" aria-label="settings">
           <ha-icon icon="mdi:cog-outline"></ha-icon>
         </div>
       </div>
 
-      <div class="rc-body">
-        <div class="rc-left">
-          <div class="rc-ring-wrap" id="rc-ring-wrap">
-            <svg viewBox="0 0 168 168">
-              <circle cx="84" cy="84" r="74" fill="none" stroke="var(--rc-surface-2)" stroke-width="10" />
-              <circle id="rc-ring-recup" cx="84" cy="84" r="74" fill="none" stroke="var(--rc-accent-warm)"
-                      stroke-width="10" stroke-linecap="round" transform="rotate(-90 84 84)" />
-              <circle cx="84" cy="84" r="58" fill="none" stroke="var(--rc-surface-2)" stroke-width="10" />
-              <circle id="rc-ring-fan" cx="84" cy="84" r="58" fill="none" stroke="var(--rc-accent-cool)"
-                      stroke-width="10" stroke-linecap="round" transform="rotate(-90 84 84)" />
-            </svg>
-            <div class="rc-ring-center">
-              <ha-icon id="rc-mode-icon" icon="mdi:power"></ha-icon>
-              <div class="rc-mode-name" id="rc-mode-name"></div>
-              <div class="rc-mode-sub" id="rc-mode-sub"></div>
+      <div class="rc-bars">
+        <div class="rc-bar-row">
+          <div class="rc-bar-top">
+            <div class="rc-bar-label">
+              <span class="rc-bar-dot" style="background: var(--rc-accent-warm)"></span>
+              <span id="rc-recup-label"></span>
             </div>
+            <span class="rc-bar-value" id="rc-recup-value">–</span>
           </div>
-
-          <div class="rc-legend">
-            <div class="rc-legend-item">
-              <span class="rc-legend-dot" style="background: var(--rc-accent-warm)"></span>
-              <span id="rc-legend-recup-label"></span>
-              <span class="rc-legend-value" id="rc-legend-recup-value">–</span>
-            </div>
-            <div class="rc-legend-item">
-              <span class="rc-legend-dot" style="background: var(--rc-accent-cool)"></span>
-              <span id="rc-legend-fan-label"></span>
-              <span class="rc-legend-value" id="rc-legend-fan-value">–</span>
-            </div>
-          </div>
+          <div class="rc-bar-track"><div class="rc-bar-fill rc-bar-warm" id="rc-bar-recup"></div></div>
         </div>
-
-        <div class="rc-right">
-          <div class="rc-modes" id="rc-modes"></div>
-          <div class="rc-stats" id="rc-stats"></div>
+        <div class="rc-bar-row">
+          <div class="rc-bar-top">
+            <div class="rc-bar-label">
+              <span class="rc-bar-dot" style="background: var(--rc-accent-cool)"></span>
+              <span id="rc-fan-label"></span>
+            </div>
+            <span class="rc-bar-value" id="rc-fan-value">–</span>
+          </div>
+          <div class="rc-bar-track"><div class="rc-bar-fill rc-bar-cool" id="rc-bar-fan"></div></div>
         </div>
       </div>
+
+      <div class="rc-modes" id="rc-modes"></div>
+
+      <div class="rc-stats" id="rc-stats"></div>
     `;
 
     this.shadowRoot.innerHTML = "";
@@ -827,18 +825,17 @@ class AlpicairRecuperationCard extends HTMLElement {
 
     this._els = {
       title: card.querySelector("#rc-title"),
-      status: card.querySelector("#rc-status"),
+      statusDot: card.querySelector("#rc-status-dot"),
+      statusText: card.querySelector("#rc-status-text"),
       gear: card.querySelector("#rc-gear"),
-      ringWrap: card.querySelector("#rc-ring-wrap"),
-      ringRecup: card.querySelector("#rc-ring-recup"),
-      ringFan: card.querySelector("#rc-ring-fan"),
+      modeBadge: card.querySelector("#rc-mode-badge"),
       modeIcon: card.querySelector("#rc-mode-icon"),
-      modeName: card.querySelector("#rc-mode-name"),
-      modeSub: card.querySelector("#rc-mode-sub"),
-      recupLabel: card.querySelector("#rc-legend-recup-label"),
-      recupValue: card.querySelector("#rc-legend-recup-value"),
-      fanLabel: card.querySelector("#rc-legend-fan-label"),
-      fanValue: card.querySelector("#rc-legend-fan-value"),
+      recupLabel: card.querySelector("#rc-recup-label"),
+      recupValue: card.querySelector("#rc-recup-value"),
+      fanLabel: card.querySelector("#rc-fan-label"),
+      fanValue: card.querySelector("#rc-fan-value"),
+      barRecup: card.querySelector("#rc-bar-recup"),
+      barFan: card.querySelector("#rc-bar-fan"),
       modes: card.querySelector("#rc-modes"),
       stats: card.querySelector("#rc-stats"),
     };
@@ -847,10 +844,6 @@ class AlpicairRecuperationCard extends HTMLElement {
       onTap: () => rcHandleAction(this, this._hass, this._config.settings_tap_action),
       onHold: () => rcHandleAction(this, this._hass, this._config.settings_hold_action),
     });
-
-    // circle circumferences for stroke-dashoffset math
-    this._circRecup = 2 * Math.PI * 74;
-    this._circFan = 2 * Math.PI * 58;
   }
 
   _currentModeKey() {
@@ -897,19 +890,17 @@ class AlpicairRecuperationCard extends HTMLElement {
 
     const modeKey = this._currentModeKey() || "off";
     const meta = RC_MODE_META[modeKey];
+    const running = modeKey !== "off";
 
     this._els.title.textContent = this._config.title || this._t("title");
 
-    const running = modeKey !== "off";
-    this._els.status.textContent = running ? this._t("running") : this._t("stopped");
-
     this._els.modeIcon.setAttribute("icon", meta.icon);
     this._els.modeIcon.style.color = meta.accent;
-    this._els.modeName.textContent = this._t(modeKey);
-    this._els.modeName.style.color = meta.accent;
-    this._els.modeSub.textContent = running ? this._t("running") : this._t("stopped");
+    this._els.modeBadge.style.boxShadow = running ? `0 0 0 2px ${meta.accent}55` : "none";
+    this._els.modeBadge.classList.toggle("rc-breathing", running);
 
-    this._els.ringWrap.classList.toggle("rc-breathing", running);
+    this._els.statusDot.classList.toggle("rc-on", running);
+    this._els.statusText.textContent = `${this._t(modeKey)} · ${running ? this._t("running") : this._t("stopped")}`;
 
     const fan = this._readNumberState(this._config.fan_speed_entity);
     const recup = this._readNumberState(this._config.recuperation_entity);
@@ -921,14 +912,10 @@ class AlpicairRecuperationCard extends HTMLElement {
 
     const recupPct = recup && recup.value !== null ? recup.value : 0;
     const fanPct = fan && fan.value !== null ? fan.value : 0;
-    this._els.ringRecup.setAttribute(
-      "stroke-dasharray",
-      `${(recupPct / 100) * this._circRecup} ${this._circRecup}`
-    );
-    this._els.ringFan.setAttribute(
-      "stroke-dasharray",
-      `${(fanPct / 100) * this._circFan} ${this._circFan}`
-    );
+    this._els.barRecup.style.width = `${recupPct}%`;
+    this._els.barFan.style.width = `${fanPct}%`;
+    this._els.barRecup.classList.toggle("rc-breathing", running);
+    this._els.barFan.classList.toggle("rc-breathing", running);
 
     // mode selector buttons (rebuild only if not yet built for this language)
     if (this._els.modes.dataset.lang !== lang) {
