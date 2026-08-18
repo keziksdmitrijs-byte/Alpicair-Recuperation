@@ -873,28 +873,50 @@ class AlpicairRecuperationCard extends HTMLElement {
     });
   }
 
+  /**
+   * Only cycle through modes that actually exist on the target entity.
+   * For `select`/`input_select` entities Home Assistant exposes the valid
+   * choices as the `options` attribute — if it's present, any RC_ACTIVE_MODES
+   * entry whose mapped raw value isn't in that list is skipped instead of
+   * being sent as an (invalid, silently rejected) service call. This is what
+   * makes a 4-state device (no "Boost" tier, for example) work correctly
+   * without extra configuration.
+   */
+  _availableActiveModes() {
+    if (!this._hass || !this._config.mode_entity) return RC_ACTIVE_MODES;
+    const stateObj = this._hass.states[this._config.mode_entity];
+    const options = stateObj && stateObj.attributes && stateObj.attributes.options;
+    if (!Array.isArray(options)) return RC_ACTIVE_MODES;
+    const available = RC_ACTIVE_MODES.filter((key) => options.includes(this._config.mode_map[key]));
+    return available.length ? available : RC_ACTIVE_MODES;
+  }
+
   /** Header power icon: dedicated off / restore-last-mode toggle. */
   _toggleOff() {
     const current = this._currentModeKey();
+    const active = this._availableActiveModes();
     if (current && current !== "off") {
       this._lastActiveMode = current;
       this._setModeKey("off");
     } else {
-      this._setModeKey(this._lastActiveMode || RC_ACTIVE_MODES[0]);
+      const restore = active.includes(this._lastActiveMode) ? this._lastActiveMode : active[0];
+      this._setModeKey(restore);
     }
   }
 
-  /** Ring center: cycles through the four running modes (off excluded). */
+  /** Ring center: cycles through the running modes that exist on this entity (off excluded). */
   _cycleMode() {
+    const active = this._availableActiveModes();
     const current = this._currentModeKey();
-    if (!current || current === "off") {
-      this._setModeKey(RC_ACTIVE_MODES[0]);
+    if (!current || current === "off" || !active.includes(current)) {
+      this._setModeKey(active[0]);
       return;
     }
-    const idx = RC_ACTIVE_MODES.indexOf(current);
-    const next = RC_ACTIVE_MODES[(idx + 1) % RC_ACTIVE_MODES.length];
+    const idx = active.indexOf(current);
+    const next = active[(idx + 1) % active.length];
     this._setModeKey(next);
   }
+
 
   _readNumberState(entityId) {
     if (!this._hass || !entityId) return null;

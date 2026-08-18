@@ -116,6 +116,25 @@ layout: square       # square (NSPanel Pro) | wide (portrait 9:16, NSPanel Pro 1
   the unit is running it switches to Off and remembers the mode you were
   on; tapping it again restores that mode (or defaults to Building
   protection if nothing was remembered yet).
+- `mode_map` must contain the **exact raw state text** of your entity —
+  case and spelling included. If your entity is a `select`/`input_select`
+  and exposes an `options` attribute, the card automatically skips any
+  configured mode that isn't in that list (e.g. a 4-state device with no
+  "Boost" tier), so you don't need to remove or fake an entry for it.
+
+**Example** for a device with only 4 states, in Latvian:
+
+```yaml
+mode_entity: select.ventilacijas_rezims
+mode_service: select.select_option
+mode_service_data_key: option
+mode_map:
+  off: "Izslēgts"
+  building_protection: "Ēkas aizsardzība"
+  economy: "Ekonomiskais"
+  comfort: "Normālais"
+  boost: "Boost"     # doesn't exist on this device — automatically skipped when cycling
+```
 
 `mode_service` also works for an `input_select`
 (`input_select.select_option` / key `option`), or you can point it at
