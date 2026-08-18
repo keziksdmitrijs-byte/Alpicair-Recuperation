@@ -2,9 +2,10 @@
  * Alpicair Recuperation Card
  * https://github.com/keziksdmitrijs-byte/Alpicair-Recuperation
  *
- * Two custom elements are registered from this single file so HACS only
+ * Three custom elements are registered from this single file so HACS only
  * needs to load one resource:
- *   - alpicair-recuperation-card            (main dashboard tile)
+ *   - alpicair-recuperation-card            (ring gauge + mode control, square)
+ *   - alpicair-recuperation-sensors-card    (temperatures + target-temp slider, square)
  *   - alpicair-recuperation-card-settings   (dedicated settings screen)
  *
  * No build step, no external dependencies. Uses <ha-icon> which is already
@@ -20,6 +21,7 @@ const RC_STORAGE_THEME = "alpicair-recuperation-card-theme";
 const RC_EVENT_SETTINGS_CHANGED = "alpicair-recuperation-card-settings-changed";
 
 const RC_MODES = ["off", "building_protection", "economy", "comfort", "boost"];
+const RC_ACTIVE_MODES = ["building_protection", "economy", "comfort", "boost"];
 
 const RC_MODE_META = {
   off: { icon: "mdi:power", accent: "var(--rc-muted)" },
@@ -39,7 +41,6 @@ const RC_I18N = {
     indoor: "Indoor",
     outdoor: "Outdoor",
     supply: "Supply air",
-    target_temp: "Target temperature",
     off: "Off",
     building_protection: "Building protection",
     economy: "Economy",
@@ -47,6 +48,8 @@ const RC_I18N = {
     boost: "Boost",
     running: "Running",
     stopped: "Stopped",
+    tap_hint: "Tap to change",
+    target_temp: "Target temperature",
     language: "Language",
     theme: "Appearance",
     theme_light: "Light",
@@ -68,7 +71,6 @@ const RC_I18N = {
     indoor: "В доме",
     outdoor: "На улице",
     supply: "Приточный воздух",
-    target_temp: "Целевая температура",
     off: "Выключено",
     building_protection: "Защита здания",
     economy: "Экономия",
@@ -76,6 +78,8 @@ const RC_I18N = {
     boost: "Ускоренный",
     running: "Работает",
     stopped: "Остановлен",
+    tap_hint: "Нажмите, чтобы сменить",
+    target_temp: "Целевая температура",
     language: "Язык",
     theme: "Оформление",
     theme_light: "Светлая",
@@ -97,7 +101,6 @@ const RC_I18N = {
     indoor: "Telpā",
     outdoor: "Ārā",
     supply: "Pievadītais gaiss",
-    target_temp: "Mērķa temperatūra",
     off: "Izslēgts",
     building_protection: "Ēkas aizsardzība",
     economy: "Ekonomija",
@@ -105,6 +108,8 @@ const RC_I18N = {
     boost: "Paātrināts",
     running: "Darbojas",
     stopped: "Apturēts",
+    tap_hint: "Pieskaries, lai mainītu",
+    target_temp: "Mērķa temperatūra",
     language: "Valoda",
     theme: "Izskats",
     theme_light: "Gaišs",
@@ -181,7 +186,7 @@ const RC_STYLES = `
     background: var(--rc-bg);
     color: var(--rc-text);
     border-radius: var(--rc-radius);
-    padding: 18px 18px 20px;
+    padding: 20px;
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
     font-size: 16px;
     box-shadow: var(--rc-shadow);
@@ -191,7 +196,7 @@ const RC_STYLES = `
 `;
 
 /* ----------------------------------------------------------------------- */
-/*  Action handling shared by both cards (tap / hold)                      */
+/*  Action handling shared by all cards (tap / hold)                       */
 /* ----------------------------------------------------------------------- */
 
 function rcHandleAction(el, hass, actionConfig) {
@@ -252,7 +257,7 @@ function rcBindPressActions(el, { onTap, onHold, holdTimeMs = 500 }) {
     }
   };
 
-  el.addEventListener("pointerdown", (ev) => {
+  el.addEventListener("pointerdown", () => {
     didHold = false;
     clear();
     pressTimer = setTimeout(() => {
@@ -272,7 +277,6 @@ function rcBindPressActions(el, { onTap, onHold, holdTimeMs = 500 }) {
   el.addEventListener("pointerleave", clear);
   el.addEventListener("pointercancel", clear);
 
-  // keyboard accessibility: Enter/Space triggers tap
   el.addEventListener("keydown", (ev) => {
     if (ev.key === "Enter" || ev.key === " ") {
       ev.preventDefault();
@@ -290,11 +294,6 @@ function rcBindPressActions(el, { onTap, onHold, holdTimeMs = 500 }) {
 
 let _rcHaFormLoading = null;
 
-/**
- * <ha-form> is defined lazily by the HA frontend. Forcing a stock card's
- * config element to load pulls in ha-form + all its selectors as a
- * side-effect. Safe to call repeatedly — it resolves instantly once loaded.
- */
 function rcEnsureHaForm() {
   if (customElements.get("ha-form")) return Promise.resolve();
   if (_rcHaFormLoading) return _rcHaFormLoading;
@@ -316,11 +315,6 @@ function rcEnsureHaForm() {
   return _rcHaFormLoading;
 }
 
-/**
- * Small base class shared by both card editors: waits for ha-form, then
- * renders a single <ha-form> bound to schema()/data()/computeLabel(),
- * and forwards value-changed as a standard "config-changed" event.
- */
 class RcEditorBase extends HTMLElement {
   setConfig(config) {
     this._config = config || {};
@@ -363,13 +357,40 @@ class RcEditorBase extends HTMLElement {
   }
 }
 
-const RC_UI_ACTION_FIELDS = [
-  "navigate",
-  "url",
-  "call-service",
-  "more-info",
-  "none",
-];
+const RC_LAYOUT_SELECTOR = {
+  select: {
+    mode: "dropdown",
+    options: [
+      { value: "square", label: "Square (NSPanel Pro)" },
+      { value: "wide", label: "Portrait 9:16 (NSPanel Pro 120)" },
+    ],
+  },
+};
+
+const RC_LANGUAGE_SELECTOR = {
+  select: {
+    mode: "dropdown",
+    options: [
+      { value: "auto", label: "Auto (from settings card)" },
+      { value: "en", label: "English" },
+      { value: "ru", label: "Русский" },
+      { value: "lv", label: "Latviešu" },
+    ],
+  },
+};
+
+const RC_THEME_SELECTOR = {
+  select: {
+    mode: "dropdown",
+    options: [
+      { value: "auto", label: "Match Home Assistant" },
+      { value: "light", label: "Light" },
+      { value: "dark", label: "Dark" },
+    ],
+  },
+};
+
+/* ---------------------- editor: ring / mode card ------------------------ */
 
 class AlpicairRecuperationCardEditor extends RcEditorBase {
   formData() {
@@ -378,9 +399,6 @@ class AlpicairRecuperationCardEditor extends RcEditorBase {
       mode_entity: this._config.mode_entity || "",
       fan_speed_entity: this._config.fan_speed_entity || "",
       recuperation_entity: this._config.recuperation_entity || "",
-      temp_indoor_entity: this._config.temp_indoor_entity || "",
-      temp_outdoor_entity: this._config.temp_outdoor_entity || "",
-      temp_supply_entity: this._config.temp_supply_entity || "",
       mode_service: this._config.mode_service || "select.select_option",
       mode_service_data_key: this._config.mode_service_data_key || "option",
       mode_map: {
@@ -396,10 +414,6 @@ class AlpicairRecuperationCardEditor extends RcEditorBase {
       language: this._config.language || "auto",
       theme: this._config.theme || "auto",
       layout: this._config.layout || "square",
-      target_temp_entity: this._config.target_temp_entity || "",
-      target_temp_min: this._config.target_temp_min ?? 15,
-      target_temp_max: this._config.target_temp_max ?? 24,
-      target_temp_step: this._config.target_temp_step ?? 1,
     };
   }
 
@@ -413,9 +427,6 @@ class AlpicairRecuperationCardEditor extends RcEditorBase {
           { name: "mode_entity", selector: { entity: {} } },
           { name: "fan_speed_entity", selector: { entity: { domain: "sensor" } } },
           { name: "recuperation_entity", selector: { entity: { domain: "sensor" } } },
-          { name: "temp_indoor_entity", selector: { entity: { domain: "sensor" } } },
-          { name: "temp_outdoor_entity", selector: { entity: { domain: "sensor" } } },
-          { name: "temp_supply_entity", selector: { entity: { domain: "sensor" } } },
         ],
       },
       {
@@ -451,6 +462,71 @@ class AlpicairRecuperationCardEditor extends RcEditorBase {
         ],
       },
       {
+        type: "grid",
+        name: "",
+        schema: [
+          { name: "language", selector: RC_LANGUAGE_SELECTOR },
+          { name: "theme", selector: RC_THEME_SELECTOR },
+          { name: "layout", selector: RC_LAYOUT_SELECTOR },
+        ],
+      },
+    ];
+  }
+
+  computeLabel(schema) {
+    const labels = {
+      title: "Card title",
+      mode_entity: "Mode entity",
+      fan_speed_entity: "Fan speed sensor (%)",
+      recuperation_entity: "Recuperation sensor (%)",
+      mode_service: "Service to call (domain.service)",
+      mode_service_data_key: "Service data key for the option",
+      mode_map: "Raw option values per mode",
+      off: "Off",
+      building_protection: "Building protection",
+      economy: "Economy",
+      comfort: "Comfort",
+      boost: "Boost",
+      settings_tap_action: "Tap",
+      settings_hold_action: "Hold",
+      language: "Language",
+      theme: "Appearance",
+      layout: "Card layout (panel shape)",
+    };
+    return labels[schema.name] || schema.name;
+  }
+}
+
+/* --------------------------- editor: sensors card ------------------------ */
+
+class AlpicairRecuperationSensorsCardEditor extends RcEditorBase {
+  formData() {
+    return {
+      temp_indoor_entity: this._config.temp_indoor_entity || "",
+      temp_outdoor_entity: this._config.temp_outdoor_entity || "",
+      temp_supply_entity: this._config.temp_supply_entity || "",
+      target_temp_entity: this._config.target_temp_entity || "",
+      target_temp_min: this._config.target_temp_min ?? 15,
+      target_temp_max: this._config.target_temp_max ?? 24,
+      target_temp_step: this._config.target_temp_step ?? 1,
+      language: this._config.language || "auto",
+      theme: this._config.theme || "auto",
+      layout: this._config.layout || "square",
+    };
+  }
+
+  formSchema() {
+    return [
+      {
+        type: "grid",
+        name: "",
+        schema: [
+          { name: "temp_indoor_entity", selector: { entity: { domain: "sensor" } } },
+          { name: "temp_outdoor_entity", selector: { entity: { domain: "sensor" } } },
+          { name: "temp_supply_entity", selector: { entity: { domain: "sensor" } } },
+        ],
+      },
+      {
         type: "expandable",
         name: "target_temp_group",
         title: "Target temperature slider",
@@ -472,45 +548,9 @@ class AlpicairRecuperationCardEditor extends RcEditorBase {
         type: "grid",
         name: "",
         schema: [
-          {
-            name: "language",
-            selector: {
-              select: {
-                mode: "dropdown",
-                options: [
-                  { value: "auto", label: "Auto (from settings card)" },
-                  { value: "en", label: "English" },
-                  { value: "ru", label: "Русский" },
-                  { value: "lv", label: "Latviešu" },
-                ],
-              },
-            },
-          },
-          {
-            name: "theme",
-            selector: {
-              select: {
-                mode: "dropdown",
-                options: [
-                  { value: "auto", label: "Match Home Assistant" },
-                  { value: "light", label: "Light" },
-                  { value: "dark", label: "Dark" },
-                ],
-              },
-            },
-          },
-          {
-            name: "layout",
-            selector: {
-              select: {
-                mode: "dropdown",
-                options: [
-                  { value: "square", label: "Square (NSPanel Pro)" },
-                  { value: "wide", label: "Wide (NSPanel Pro 120)" },
-                ],
-              },
-            },
-          },
+          { name: "language", selector: RC_LANGUAGE_SELECTOR },
+          { name: "theme", selector: RC_THEME_SELECTOR },
+          { name: "layout", selector: RC_LAYOUT_SELECTOR },
         ],
       },
     ];
@@ -518,34 +558,22 @@ class AlpicairRecuperationCardEditor extends RcEditorBase {
 
   computeLabel(schema) {
     const labels = {
-      title: "Card title",
-      mode_entity: "Mode entity",
-      fan_speed_entity: "Fan speed sensor (%)",
-      recuperation_entity: "Recuperation sensor (%)",
       temp_indoor_entity: "Indoor temperature sensor",
       temp_outdoor_entity: "Outdoor temperature sensor",
       temp_supply_entity: "Supply air temperature sensor",
-      mode_service: "Service to call (domain.service)",
-      mode_service_data_key: "Service data key for the option",
-      mode_map: "Raw option values per mode",
-      off: "Off",
-      building_protection: "Building protection",
-      economy: "Economy",
-      comfort: "Comfort",
-      boost: "Boost",
-      settings_tap_action: "Tap",
-      settings_hold_action: "Hold",
-      language: "Language",
-      theme: "Appearance",
-      layout: "Card layout (panel shape)",
       target_temp_entity: "Target temperature entity (climate / input_number / number)",
       target_temp_min: "Min °C",
       target_temp_max: "Max °C",
       target_temp_step: "Step °C",
+      language: "Language",
+      theme: "Appearance",
+      layout: "Card layout (panel shape)",
     };
     return labels[schema.name] || schema.name;
   }
 }
+
+/* --------------------------- editor: settings card ----------------------- */
 
 class AlpicairRecuperationCardSettingsEditor extends RcEditorBase {
   formData() {
@@ -568,18 +596,7 @@ class AlpicairRecuperationCardSettingsEditor extends RcEditorBase {
           { name: "back_hold_action", selector: { ui_action: {} } },
         ],
       },
-      {
-        name: "layout",
-        selector: {
-          select: {
-            mode: "dropdown",
-            options: [
-              { value: "square", label: "Square (NSPanel Pro)" },
-              { value: "wide", label: "Wide (NSPanel Pro 120)" },
-            ],
-          },
-        },
-      },
+      { name: "layout", selector: RC_LAYOUT_SELECTOR },
     ];
   }
 
@@ -594,10 +611,11 @@ class AlpicairRecuperationCardSettingsEditor extends RcEditorBase {
 }
 
 customElements.define("alpicair-recuperation-card-editor", AlpicairRecuperationCardEditor);
+customElements.define("alpicair-recuperation-sensors-card-editor", AlpicairRecuperationSensorsCardEditor);
 customElements.define("alpicair-recuperation-card-settings-editor", AlpicairRecuperationCardSettingsEditor);
 
 /* ----------------------------------------------------------------------- */
-/*  <alpicair-recuperation-card>                                            */
+/*  <alpicair-recuperation-card>  — ring gauge + mode control (square)      */
 /* ----------------------------------------------------------------------- */
 
 class AlpicairRecuperationCard extends HTMLElement {
@@ -611,13 +629,6 @@ class AlpicairRecuperationCard extends HTMLElement {
       mode_entity: "",
       fan_speed_entity: "",
       recuperation_entity: "",
-      temp_indoor_entity: "",
-      temp_outdoor_entity: "",
-      temp_supply_entity: "",
-      target_temp_entity: "",
-      target_temp_min: 15,
-      target_temp_max: 24,
-      target_temp_step: 1,
       settings_tap_action: { action: "navigate", navigation_path: "/recuperator-settings" },
       settings_hold_action: { action: "none" },
       language: "auto",
@@ -641,12 +652,10 @@ class AlpicairRecuperationCard extends HTMLElement {
       language: "auto",
       theme: "auto",
       layout: "square",
-      target_temp_min: 15,
-      target_temp_max: 24,
-      target_temp_step: 1,
       ...config,
     };
     this._built = false;
+    this._lastActiveMode = null;
     this._render();
   }
 
@@ -657,7 +666,7 @@ class AlpicairRecuperationCard extends HTMLElement {
   }
 
   getCardSize() {
-    return this._config && this._config.layout === "wide" ? 4 : 4;
+    return 4;
   }
 
   connectedCallback() {
@@ -694,136 +703,346 @@ class AlpicairRecuperationCard extends HTMLElement {
 
     const style = document.createElement("style");
     style.textContent = RC_STYLES + `
+      .rc-card { aspect-ratio: 1 / 1; display: flex; flex-direction: column; }
       .rc-header {
-        display: flex; align-items: center; gap: 12px;
-        margin-bottom: 16px;
+        display: flex; align-items: center; justify-content: space-between;
+        flex: 0 0 auto; margin-bottom: 12px;
       }
-      .rc-mode-badge {
-        flex: 0 0 auto; width: 46px; height: 46px; border-radius: 14px;
-        display: flex; align-items: center; justify-content: center;
-        background: var(--rc-surface-2); transition: background var(--rc-transition);
-      }
-      .rc-mode-badge.rc-breathing { animation: rc-breathe 3.6s ease-in-out infinite; }
-      @keyframes rc-breathe {
-        0%, 100% { transform: scale(1); }
-        50% { transform: scale(1.08); }
-      }
-      .rc-mode-badge ha-icon { --mdc-icon-size: 24px; transition: color var(--rc-transition); }
-      .rc-header-text { flex: 1 1 auto; min-width: 0; }
-      .rc-title {
-        font-size: 19px; font-weight: 700; letter-spacing: -0.01em;
-      }
-      .rc-status {
-        display: flex; align-items: center; gap: 6px;
-        font-size: 14px; color: var(--rc-muted); margin-top: 2px; font-weight: 600;
-      }
-      .rc-status-dot {
-        width: 8px; height: 8px; border-radius: 50%; background: var(--rc-muted);
-        transition: background var(--rc-transition);
-      }
-      .rc-status-dot.rc-on { background: #4ADE80; box-shadow: 0 0 0 3px rgba(74,222,128,0.18); }
-      .rc-gear {
-        flex: 0 0 auto; width: 46px; height: 46px; border-radius: 14px;
+      .rc-icon-btn {
+        width: 42px; height: 42px; border-radius: 13px;
         display: flex; align-items: center; justify-content: center;
         background: var(--rc-surface-2); cursor: pointer;
         transition: transform var(--rc-transition), background var(--rc-transition);
-        outline: none;
+        outline: none; flex: 0 0 auto;
       }
+      .rc-icon-btn:active { transform: scale(0.92); }
+      .rc-icon-btn ha-icon { --mdc-icon-size: 21px; color: var(--rc-muted); }
+      .rc-icon-btn.rc-power-on ha-icon { color: #4ADE80; }
       .rc-gear:hover { transform: rotate(20deg); }
-      .rc-gear:active { transform: rotate(45deg) scale(0.94); }
-      .rc-gear ha-icon { color: var(--rc-muted); --mdc-icon-size: 24px; }
+      .rc-title { font-size: 17px; font-weight: 700; letter-spacing: -0.01em; text-align: center; flex: 1 1 auto; }
 
-      /* --- bars (fan speed / recuperation), replace the old ring gauges --- */
-      .rc-bars { display: flex; flex-direction: column; gap: 12px; margin-bottom: 16px; }
-      .rc-bar-row { display: flex; flex-direction: column; gap: 6px; }
-      .rc-bar-top { display: flex; align-items: baseline; justify-content: space-between; }
-      .rc-bar-label { display: flex; align-items: center; gap: 7px; font-size: 13px; color: var(--rc-muted); font-weight: 600; }
-      .rc-bar-dot { width: 9px; height: 9px; border-radius: 50%; flex: 0 0 auto; }
-      .rc-bar-value { font-size: 16px; font-weight: 700; font-variant-numeric: tabular-nums; color: var(--rc-text); }
-      .rc-bar-track {
-        position: relative; width: 100%; height: 14px; border-radius: 999px;
-        background: var(--rc-surface-2); overflow: hidden;
+      .rc-ring-area { flex: 1 1 auto; display: flex; align-items: center; justify-content: center; min-height: 0; }
+      .rc-ring-wrap { position: relative; width: 100%; height: 100%; max-width: 220px; max-height: 220px; }
+      .rc-ring-wrap svg { width: 100%; height: 100%; display: block; }
+      .rc-ring-center {
+        position: absolute; border-radius: 50%; background: var(--rc-surface);
+        display: flex; flex-direction: column; align-items: center; justify-content: center;
+        text-align: center; cursor: pointer; outline: none;
+        transition: background var(--rc-transition);
       }
-      .rc-bar-fill {
-        position: absolute; inset: 0 auto 0 0; height: 100%; width: 0%;
-        border-radius: 999px; transition: width 420ms cubic-bezier(.4,0,.2,1);
+      .rc-ring-center.rc-breathing { animation: rc-breathe 3.6s ease-in-out infinite; }
+      @keyframes rc-breathe {
+        0%, 100% { transform: scale(1); }
+        50% { transform: scale(1.03); }
       }
-      .rc-bar-fill.rc-bar-warm { background: linear-gradient(90deg, var(--rc-accent-warm), #FBCB8A); }
-      .rc-bar-fill.rc-bar-cool { background: linear-gradient(90deg, var(--rc-accent-cool), #8BE7DD); }
-      .rc-bar-fill.rc-breathing { animation: rc-bar-pulse 2.4s ease-in-out infinite; }
-      @keyframes rc-bar-pulse {
-        0%, 100% { filter: brightness(1); }
-        50% { filter: brightness(1.18); }
+      .rc-ring-center ha-icon { --mdc-icon-size: 28px; margin-bottom: 5px; transition: color var(--rc-transition); }
+      .rc-mode-name { font-size: 17px; font-weight: 700; }
+      .rc-tap-hint {
+        display: flex; align-items: center; gap: 3px; font-size: 10.5px; color: var(--rc-muted);
+        margin-top: 4px;
       }
+      .rc-tap-hint ha-icon { --mdc-icon-size: 12px; margin: 0; color: var(--rc-muted); }
 
-      .rc-modes {
-        display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px;
-        margin-bottom: 16px;
+      .rc-legend {
+        flex: 0 0 auto; display: flex; justify-content: center; gap: 20px; margin-top: 12px; flex-wrap: wrap;
       }
-      .rc-mode-btn {
-        display: flex; flex-direction: column; align-items: center; gap: 5px;
-        padding: 10px 6px 9px; border-radius: 14px; background: var(--rc-surface);
-        border: 1px solid var(--rc-border); cursor: pointer;
-        transition: box-shadow var(--rc-transition), border-color var(--rc-transition), transform 120ms;
-        outline: none;
-      }
-      .rc-mode-btn:active { transform: scale(0.96); }
-      .rc-mode-btn ha-icon { --mdc-icon-size: 22px; color: var(--rc-muted); }
-      .rc-mode-btn span { font-size: 11.5px; color: var(--rc-muted); font-weight: 600; text-align: center; }
-      .rc-mode-btn.active {
-        border-color: var(--rc-accent); box-shadow: 0 0 0 1px var(--rc-accent), 0 6px 16px -6px var(--rc-accent);
-      }
-      .rc-mode-btn.active ha-icon, .rc-mode-btn.active span { color: var(--rc-accent); }
+      .rc-legend-item { display: flex; align-items: center; gap: 7px; font-size: 13px; color: var(--rc-muted); white-space: nowrap; }
+      .rc-legend-dot { width: 9px; height: 9px; border-radius: 50%; flex: 0 0 auto; }
+      .rc-legend-value { font-weight: 700; font-variant-numeric: tabular-nums; color: var(--rc-text); }
 
-      .rc-stats {
-        display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px;
-      }
-      .rc-stat {
-        background: var(--rc-surface); border-radius: 14px; padding: 11px 8px;
-        text-align: center; border: 1px solid var(--rc-border);
-      }
-      .rc-stat-label { font-size: 11px; color: var(--rc-muted); font-weight: 600; text-transform: uppercase; letter-spacing: .03em; }
-      .rc-stat-value { font-size: 20px; font-weight: 700; font-variant-numeric: tabular-nums; margin-top: 3px; }
-
-      /* --- Layout: square (default, e.g. NSPanel Pro, ~1:1 screen) -------- */
-      .rc-body { display: flex; flex-direction: column; }
-      .rc-left { display: flex; flex-direction: column; }
-      .rc-right { display: flex; flex-direction: column; }
-
-      /* --- Layout: wide (Sonoff NSPanel Pro 120, tall portrait 9:16 screen)
-         Despite the name, this panel is physically narrow and tall, so the
-         card locks to a 9:16 (portrait) box and everything stacks in a
-         single column, just tightened up to fit the narrower width. ------ */
+      /* --- Layout: wide (Sonoff NSPanel Pro 120, portrait 9:16 screen) ---- */
       :host([data-rc-layout="wide"]) .rc-card {
-        aspect-ratio: 9 / 16; width: 100%; max-width: 340px; box-sizing: border-box;
-        display: flex; flex-direction: column; padding: 16px 14px;
+        aspect-ratio: 9 / 16; max-width: 340px; width: 100%; box-sizing: border-box; padding: 18px 16px;
       }
-      :host([data-rc-layout="wide"]) .rc-header { margin-bottom: 12px; flex: 0 0 auto; }
-      :host([data-rc-layout="wide"]) .rc-body {
-        flex: 0 0 auto; flex-direction: column; gap: 0;
-      }
-      :host([data-rc-layout="wide"]) .rc-left {
-        gap: 10px;
-      }
-      :host([data-rc-layout="wide"]) .rc-bars { margin-bottom: 14px; }
-      :host([data-rc-layout="wide"]) .rc-right {
-        gap: 12px;
-      }
-      :host([data-rc-layout="wide"]) .rc-modes { margin-bottom: 0; gap: 6px; }
-      :host([data-rc-layout="wide"]) .rc-mode-btn { padding: 9px 4px 8px; }
-      :host([data-rc-layout="wide"]) .rc-mode-btn span { font-size: 11px; }
-      :host([data-rc-layout="wide"]) .rc-stats {
-        grid-template-columns: 1fr; gap: 6px;
-      }
-      :host([data-rc-layout="wide"]) .rc-stat {
-        display: flex; align-items: center; justify-content: space-between;
-        text-align: left; padding: 10px 12px;
-      }
-      :host([data-rc-layout="wide"]) .rc-stat-value { margin-top: 0; }
-      :host([data-rc-layout="wide"]) .rc-temp-row { flex: 1 1 auto; margin-top: 16px; display: flex; flex-direction: column; justify-content: flex-end; }
+      :host([data-rc-layout="wide"]) .rc-ring-wrap { max-width: 190px; max-height: 190px; }
+      :host([data-rc-layout="wide"]) .rc-mode-name { font-size: 16px; }
+    `;
 
-      /* --- target temperature slider (both layouts) ----------------------- */
-      .rc-temp-row { margin-top: 16px; }
+    const card = document.createElement("div");
+    card.className = "rc-card";
+    card.innerHTML = `
+      <div class="rc-header">
+        <div class="rc-icon-btn" id="rc-power" tabindex="0" role="button" aria-label="power">
+          <ha-icon icon="mdi:power"></ha-icon>
+        </div>
+        <div class="rc-title" id="rc-title"></div>
+        <div class="rc-icon-btn rc-gear" id="rc-gear" tabindex="0" role="button" aria-label="settings">
+          <ha-icon icon="mdi:cog-outline"></ha-icon>
+        </div>
+      </div>
+
+      <div class="rc-ring-area">
+        <div class="rc-ring-wrap" id="rc-ring-wrap">
+          <svg viewBox="0 0 190 190">
+            <circle cx="95" cy="95" r="82" fill="none" stroke="var(--rc-surface-2)" stroke-width="12" />
+            <circle id="rc-ring-recup" cx="95" cy="95" r="82" fill="none" stroke="var(--rc-accent-warm)"
+                    stroke-width="12" stroke-linecap="round" transform="rotate(-90 95 95)" />
+            <circle cx="95" cy="95" r="63" fill="none" stroke="var(--rc-surface-2)" stroke-width="12" />
+            <circle id="rc-ring-fan" cx="95" cy="95" r="63" fill="none" stroke="var(--rc-accent-cool)"
+                    stroke-width="12" stroke-linecap="round" transform="rotate(-90 95 95)" />
+          </svg>
+          <div class="rc-ring-center" id="rc-ring-center" style="inset: 44px;" tabindex="0" role="button" aria-label="change mode">
+            <ha-icon id="rc-mode-icon" icon="mdi:power"></ha-icon>
+            <div class="rc-mode-name" id="rc-mode-name"></div>
+            <div class="rc-tap-hint"><ha-icon icon="mdi:gesture-tap"></ha-icon><span id="rc-tap-hint-text"></span></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="rc-legend">
+        <div class="rc-legend-item">
+          <span class="rc-legend-dot" style="background: var(--rc-accent-warm)"></span>
+          <span id="rc-recup-label"></span>
+          <span class="rc-legend-value" id="rc-recup-value">–</span>
+        </div>
+        <div class="rc-legend-item">
+          <span class="rc-legend-dot" style="background: var(--rc-accent-cool)"></span>
+          <span id="rc-fan-label"></span>
+          <span class="rc-legend-value" id="rc-fan-value">–</span>
+        </div>
+      </div>
+    `;
+
+    this.shadowRoot.innerHTML = "";
+    this.shadowRoot.appendChild(style);
+    this.shadowRoot.appendChild(card);
+
+    this._els = {
+      title: card.querySelector("#rc-title"),
+      power: card.querySelector("#rc-power"),
+      gear: card.querySelector("#rc-gear"),
+      ringWrap: card.querySelector("#rc-ring-wrap"),
+      ringRecup: card.querySelector("#rc-ring-recup"),
+      ringFan: card.querySelector("#rc-ring-fan"),
+      ringCenter: card.querySelector("#rc-ring-center"),
+      modeIcon: card.querySelector("#rc-mode-icon"),
+      modeName: card.querySelector("#rc-mode-name"),
+      tapHintText: card.querySelector("#rc-tap-hint-text"),
+      recupLabel: card.querySelector("#rc-recup-label"),
+      recupValue: card.querySelector("#rc-recup-value"),
+      fanLabel: card.querySelector("#rc-fan-label"),
+      fanValue: card.querySelector("#rc-fan-value"),
+    };
+
+    rcBindPressActions(this._els.gear, {
+      onTap: () => rcHandleAction(this, this._hass, this._config.settings_tap_action),
+      onHold: () => rcHandleAction(this, this._hass, this._config.settings_hold_action),
+    });
+
+    this._els.power.addEventListener("click", () => this._toggleOff());
+    this._els.power.addEventListener("keydown", (ev) => {
+      if (ev.key === "Enter" || ev.key === " ") {
+        ev.preventDefault();
+        this._toggleOff();
+      }
+    });
+
+    this._els.ringCenter.addEventListener("click", () => this._cycleMode());
+    this._els.ringCenter.addEventListener("keydown", (ev) => {
+      if (ev.key === "Enter" || ev.key === " ") {
+        ev.preventDefault();
+        this._cycleMode();
+      }
+    });
+
+    this._circRecup = 2 * Math.PI * 82;
+    this._circFan = 2 * Math.PI * 63;
+  }
+
+  _currentModeKey() {
+    if (!this._hass || !this._config.mode_entity) return null;
+    const stateObj = this._hass.states[this._config.mode_entity];
+    if (!stateObj) return null;
+    const raw = stateObj.state;
+    const map = this._config.mode_map;
+    for (const key of RC_MODES) {
+      if (map[key] === raw) return key;
+    }
+    return null;
+  }
+
+  _setModeKey(key) {
+    if (!this._hass || !this._config.mode_entity) return;
+    const raw = this._config.mode_map[key];
+    if (raw === undefined) return;
+    const [domain, service] = this._config.mode_service.split(".");
+    const dataKey = this._config.mode_service_data_key;
+    this._hass.callService(domain, service, {
+      entity_id: this._config.mode_entity,
+      [dataKey]: raw,
+    });
+  }
+
+  /** Header power icon: dedicated off / restore-last-mode toggle. */
+  _toggleOff() {
+    const current = this._currentModeKey();
+    if (current && current !== "off") {
+      this._lastActiveMode = current;
+      this._setModeKey("off");
+    } else {
+      this._setModeKey(this._lastActiveMode || RC_ACTIVE_MODES[0]);
+    }
+  }
+
+  /** Ring center: cycles through the four running modes (off excluded). */
+  _cycleMode() {
+    const current = this._currentModeKey();
+    if (!current || current === "off") {
+      this._setModeKey(RC_ACTIVE_MODES[0]);
+      return;
+    }
+    const idx = RC_ACTIVE_MODES.indexOf(current);
+    const next = RC_ACTIVE_MODES[(idx + 1) % RC_ACTIVE_MODES.length];
+    this._setModeKey(next);
+  }
+
+  _readNumberState(entityId) {
+    if (!this._hass || !entityId) return null;
+    const stateObj = this._hass.states[entityId];
+    if (!stateObj) return null;
+    return { value: rcClampPercent(stateObj.state) };
+  }
+
+  _update() {
+    if (!this._hass || !this._els) return;
+    const themeMode = this._themeMode();
+    this.setAttribute("data-rc-theme", themeMode);
+    this.setAttribute("data-rc-layout", this._config.layout === "wide" ? "wide" : "square");
+
+    const modeKey = this._currentModeKey() || "off";
+    const meta = RC_MODE_META[modeKey];
+    const running = modeKey !== "off";
+    if (running) this._lastActiveMode = modeKey;
+
+    this._els.title.textContent = this._config.title || this._t("title");
+
+    this._els.power.classList.toggle("rc-power-on", running);
+
+    this._els.modeIcon.setAttribute("icon", meta.icon);
+    this._els.modeIcon.style.color = meta.accent;
+    this._els.modeName.textContent = this._t(modeKey);
+    this._els.modeName.style.color = meta.accent;
+    this._els.tapHintText.textContent = this._t("tap_hint");
+    this._els.ringCenter.classList.toggle("rc-breathing", running);
+
+    const fan = this._readNumberState(this._config.fan_speed_entity);
+    const recup = this._readNumberState(this._config.recuperation_entity);
+
+    this._els.recupLabel.textContent = this._t("recuperation");
+    this._els.fanLabel.textContent = this._t("fan_speed");
+    this._els.recupValue.textContent = recup && recup.value !== null ? `${Math.round(recup.value)}%` : "–";
+    this._els.fanValue.textContent = fan && fan.value !== null ? `${Math.round(fan.value)}%` : "–";
+
+    const recupPct = recup && recup.value !== null ? recup.value : 0;
+    const fanPct = fan && fan.value !== null ? fan.value : 0;
+    this._els.ringRecup.setAttribute(
+      "stroke-dasharray",
+      `${(recupPct / 100) * this._circRecup} ${this._circRecup}`
+    );
+    this._els.ringFan.setAttribute(
+      "stroke-dasharray",
+      `${(fanPct / 100) * this._circFan} ${this._circFan}`
+    );
+  }
+}
+
+/* ----------------------------------------------------------------------- */
+/*  <alpicair-recuperation-sensors-card> — temperatures + target temp       */
+/*  (square, no header, no mode buttons — mode is controlled on the ring   */
+/*  card)                                                                   */
+/* ----------------------------------------------------------------------- */
+
+class AlpicairRecuperationSensorsCard extends HTMLElement {
+  static getConfigElement() {
+    return document.createElement("alpicair-recuperation-sensors-card-editor");
+  }
+
+  static getStubConfig() {
+    return {
+      type: "custom:alpicair-recuperation-sensors-card",
+      temp_indoor_entity: "",
+      temp_outdoor_entity: "",
+      temp_supply_entity: "",
+      target_temp_entity: "",
+      target_temp_min: 15,
+      target_temp_max: 24,
+      target_temp_step: 1,
+      language: "auto",
+      theme: "auto",
+      layout: "square",
+    };
+  }
+
+  setConfig(config) {
+    if (!config) throw new Error("Invalid configuration");
+    this._config = {
+      language: "auto",
+      theme: "auto",
+      layout: "square",
+      target_temp_min: 15,
+      target_temp_max: 24,
+      target_temp_step: 1,
+      ...config,
+    };
+    this._built = false;
+    this._render();
+  }
+
+  set hass(hass) {
+    this._hass = hass;
+    if (!this._built) this._render();
+    this._update();
+  }
+
+  getCardSize() {
+    return 4;
+  }
+
+  connectedCallback() {
+    this._onSettingsChanged = () => this._update();
+    window.addEventListener(RC_EVENT_SETTINGS_CHANGED, this._onSettingsChanged);
+  }
+
+  disconnectedCallback() {
+    window.removeEventListener(RC_EVENT_SETTINGS_CHANGED, this._onSettingsChanged);
+  }
+
+  _lang() {
+    return rcGetLang(this._config && this._config.language);
+  }
+
+  _t(key) {
+    return rcT(this._lang(), key);
+  }
+
+  _themeMode() {
+    const t = rcGetTheme(this._config && this._config.theme);
+    if (t === "auto") {
+      return this._hass && this._hass.themes && this._hass.themes.darkMode ? "dark" : "light";
+    }
+    return t;
+  }
+
+  _render() {
+    if (!this._config) return;
+    this._built = true;
+
+    this.innerHTML = "";
+    this.attachShadow({ mode: "open" });
+
+    const style = document.createElement("style");
+    style.textContent = RC_STYLES + `
+      .rc-card { aspect-ratio: 1 / 1; display: flex; flex-direction: column; justify-content: center; gap: 16px; }
+
+      .rc-stats { display: flex; flex-direction: column; gap: 8px; }
+      .rc-stat {
+        background: var(--rc-surface); border-radius: 14px; padding: 12px 16px;
+        display: flex; align-items: center; justify-content: space-between;
+        border: 1px solid var(--rc-border);
+      }
+      .rc-stat-label { font-size: 13px; color: var(--rc-muted); font-weight: 600; text-transform: uppercase; letter-spacing: .03em; }
+      .rc-stat-value { font-size: 20px; font-weight: 700; font-variant-numeric: tabular-nums; }
+
       .rc-temp-top { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 8px; }
       .rc-temp-label { font-size: 13px; color: var(--rc-muted); font-weight: 600; }
       .rc-temp-value { font-size: 20px; font-weight: 700; font-variant-numeric: tabular-nums; color: var(--rc-text); }
@@ -849,59 +1068,18 @@ class AlpicairRecuperationCard extends HTMLElement {
         background: #ffffff; border: 3px solid var(--rc-accent-warm);
         box-shadow: 0 2px 10px rgba(0,0,0,0.28); cursor: pointer;
       }
+      .rc-temp-minmax { display: flex; justify-content: space-between; margin-top: 4px; font-size: 11px; color: var(--rc-muted); }
+
+      /* --- Layout: wide (Sonoff NSPanel Pro 120, portrait 9:16 screen) ---- */
+      :host([data-rc-layout="wide"]) .rc-card {
+        aspect-ratio: 9 / 16; max-width: 340px; width: 100%; box-sizing: border-box; padding: 18px 16px;
+      }
     `;
 
     const card = document.createElement("div");
     card.className = "rc-card";
-
     card.innerHTML = `
-      <div class="rc-header">
-        <div class="rc-mode-badge" id="rc-mode-badge">
-          <ha-icon id="rc-mode-icon" icon="mdi:power"></ha-icon>
-        </div>
-        <div class="rc-header-text">
-          <div class="rc-title" id="rc-title"></div>
-          <div class="rc-status">
-            <span class="rc-status-dot" id="rc-status-dot"></span>
-            <span id="rc-status-text"></span>
-          </div>
-        </div>
-        <div class="rc-gear" id="rc-gear" tabindex="0" role="button" aria-label="settings">
-          <ha-icon icon="mdi:cog-outline"></ha-icon>
-        </div>
-      </div>
-
-      <div class="rc-body">
-        <div class="rc-left">
-          <div class="rc-bars">
-            <div class="rc-bar-row">
-              <div class="rc-bar-top">
-                <div class="rc-bar-label">
-                  <span class="rc-bar-dot" style="background: var(--rc-accent-warm)"></span>
-                  <span id="rc-recup-label"></span>
-                </div>
-                <span class="rc-bar-value" id="rc-recup-value">–</span>
-              </div>
-              <div class="rc-bar-track"><div class="rc-bar-fill rc-bar-warm" id="rc-bar-recup"></div></div>
-            </div>
-            <div class="rc-bar-row">
-              <div class="rc-bar-top">
-                <div class="rc-bar-label">
-                  <span class="rc-bar-dot" style="background: var(--rc-accent-cool)"></span>
-                  <span id="rc-fan-label"></span>
-                </div>
-                <span class="rc-bar-value" id="rc-fan-value">–</span>
-              </div>
-              <div class="rc-bar-track"><div class="rc-bar-fill rc-bar-cool" id="rc-bar-fan"></div></div>
-            </div>
-          </div>
-        </div>
-
-        <div class="rc-right">
-          <div class="rc-modes" id="rc-modes"></div>
-          <div class="rc-stats" id="rc-stats"></div>
-        </div>
-      </div>
+      <div class="rc-stats" id="rc-stats"></div>
 
       <div class="rc-temp-row" id="rc-temp-row" style="display:none;">
         <div class="rc-temp-top">
@@ -909,6 +1087,10 @@ class AlpicairRecuperationCard extends HTMLElement {
           <span class="rc-temp-value" id="rc-temp-value">–</span>
         </div>
         <input type="range" class="rc-temp-slider" id="rc-temp-slider" min="15" max="24" step="1" />
+        <div class="rc-temp-minmax">
+          <span id="rc-temp-min-label"></span>
+          <span id="rc-temp-max-label"></span>
+        </div>
       </div>
     `;
 
@@ -917,30 +1099,14 @@ class AlpicairRecuperationCard extends HTMLElement {
     this.shadowRoot.appendChild(card);
 
     this._els = {
-      title: card.querySelector("#rc-title"),
-      statusDot: card.querySelector("#rc-status-dot"),
-      statusText: card.querySelector("#rc-status-text"),
-      gear: card.querySelector("#rc-gear"),
-      modeBadge: card.querySelector("#rc-mode-badge"),
-      modeIcon: card.querySelector("#rc-mode-icon"),
-      recupLabel: card.querySelector("#rc-recup-label"),
-      recupValue: card.querySelector("#rc-recup-value"),
-      fanLabel: card.querySelector("#rc-fan-label"),
-      fanValue: card.querySelector("#rc-fan-value"),
-      barRecup: card.querySelector("#rc-bar-recup"),
-      barFan: card.querySelector("#rc-bar-fan"),
-      modes: card.querySelector("#rc-modes"),
       stats: card.querySelector("#rc-stats"),
       tempRow: card.querySelector("#rc-temp-row"),
       tempLabel: card.querySelector("#rc-temp-label"),
       tempValue: card.querySelector("#rc-temp-value"),
       tempSlider: card.querySelector("#rc-temp-slider"),
+      tempMinLabel: card.querySelector("#rc-temp-min-label"),
+      tempMaxLabel: card.querySelector("#rc-temp-max-label"),
     };
-
-    rcBindPressActions(this._els.gear, {
-      onTap: () => rcHandleAction(this, this._hass, this._config.settings_tap_action),
-      onHold: () => rcHandleAction(this, this._hass, this._config.settings_hold_action),
-    });
 
     this._els.tempSlider.addEventListener("input", () => {
       this._els.tempValue.textContent = `${this._els.tempSlider.value}°`;
@@ -950,42 +1116,6 @@ class AlpicairRecuperationCard extends HTMLElement {
     });
   }
 
-  _currentModeKey() {
-    if (!this._hass || !this._config.mode_entity) return null;
-    const stateObj = this._hass.states[this._config.mode_entity];
-    if (!stateObj) return null;
-    const raw = stateObj.state;
-    const map = this._config.mode_map;
-    for (const key of RC_MODES) {
-      if (map[key] === raw) return key;
-    }
-    return null;
-  }
-
-  _selectMode(key) {
-    if (!this._hass || !this._config.mode_entity) return;
-    const raw = this._config.mode_map[key];
-    if (raw === undefined) return;
-    const [domain, service] = this._config.mode_service.split(".");
-    const dataKey = this._config.mode_service_data_key;
-    this._hass.callService(domain, service, {
-      entity_id: this._config.mode_entity,
-      [dataKey]: raw,
-    });
-  }
-
-  _readNumberState(entityId) {
-    if (!this._hass || !entityId) return null;
-    const stateObj = this._hass.states[entityId];
-    if (!stateObj) return null;
-    return {
-      value: rcClampPercent(stateObj.state),
-      raw: stateObj.state,
-      unit: stateObj.attributes && stateObj.attributes.unit_of_measurement,
-    };
-  }
-
-  /** Reads the current target temperature, whatever the entity domain. */
   _readTargetTemp() {
     const entityId = this._config.target_temp_entity;
     if (!this._hass || !entityId) return null;
@@ -1000,7 +1130,6 @@ class AlpicairRecuperationCard extends HTMLElement {
     return Number.isNaN(n) ? null : n;
   }
 
-  /** Commits a new target temperature using the right service for the entity domain. */
   _setTargetTemp(value) {
     const entityId = this._config.target_temp_entity;
     if (!this._hass || !entityId) return;
@@ -1025,7 +1154,6 @@ class AlpicairRecuperationCard extends HTMLElement {
         value,
       });
     } else {
-      // input_number and anything else that speaks this convention
       this._hass.callService("input_number", "set_value", {
         entity_id: entityId,
         value,
@@ -1035,67 +1163,10 @@ class AlpicairRecuperationCard extends HTMLElement {
 
   _update() {
     if (!this._hass || !this._els) return;
-    const lang = this._lang();
     const themeMode = this._themeMode();
     this.setAttribute("data-rc-theme", themeMode);
     this.setAttribute("data-rc-layout", this._config.layout === "wide" ? "wide" : "square");
 
-    const modeKey = this._currentModeKey() || "off";
-    const meta = RC_MODE_META[modeKey];
-    const running = modeKey !== "off";
-
-    this._els.title.textContent = this._config.title || this._t("title");
-
-    this._els.modeIcon.setAttribute("icon", meta.icon);
-    this._els.modeIcon.style.color = meta.accent;
-    this._els.modeBadge.style.boxShadow = running ? `0 0 0 2px ${meta.accent}55` : "none";
-    this._els.modeBadge.classList.toggle("rc-breathing", running);
-
-    this._els.statusDot.classList.toggle("rc-on", running);
-    this._els.statusText.textContent = `${this._t(modeKey)} · ${running ? this._t("running") : this._t("stopped")}`;
-
-    const fan = this._readNumberState(this._config.fan_speed_entity);
-    const recup = this._readNumberState(this._config.recuperation_entity);
-
-    this._els.recupLabel.textContent = this._t("recuperation");
-    this._els.fanLabel.textContent = this._t("fan_speed");
-    this._els.recupValue.textContent = recup && recup.value !== null ? `${Math.round(recup.value)}%` : "–";
-    this._els.fanValue.textContent = fan && fan.value !== null ? `${Math.round(fan.value)}%` : "–";
-
-    const recupPct = recup && recup.value !== null ? recup.value : 0;
-    const fanPct = fan && fan.value !== null ? fan.value : 0;
-    this._els.barRecup.style.width = `${recupPct}%`;
-    this._els.barFan.style.width = `${fanPct}%`;
-    this._els.barRecup.classList.toggle("rc-breathing", running);
-    this._els.barFan.classList.toggle("rc-breathing", running);
-
-    // mode selector buttons (rebuild only if not yet built for this language)
-    if (this._els.modes.dataset.lang !== lang) {
-      this._els.modes.dataset.lang = lang;
-      this._els.modes.innerHTML = "";
-      RC_MODES.forEach((key) => {
-        const btn = document.createElement("div");
-        btn.className = "rc-mode-btn";
-        btn.tabIndex = 0;
-        btn.setAttribute("role", "button");
-        btn.dataset.mode = key;
-        btn.style.setProperty("--rc-accent", RC_MODE_META[key].accent);
-        btn.innerHTML = `<ha-icon icon="${RC_MODE_META[key].icon}"></ha-icon><span>${rcT(lang, key)}</span>`;
-        btn.addEventListener("click", () => this._selectMode(key));
-        btn.addEventListener("keydown", (ev) => {
-          if (ev.key === "Enter" || ev.key === " ") {
-            ev.preventDefault();
-            this._selectMode(key);
-          }
-        });
-        this._els.modes.appendChild(btn);
-      });
-    }
-    [...this._els.modes.children].forEach((btn) => {
-      btn.classList.toggle("active", btn.dataset.mode === modeKey);
-    });
-
-    // stat tiles: indoor / outdoor / supply (exhaust intentionally omitted)
     const statDefs = [
       { key: "indoor", entity: this._config.temp_indoor_entity },
       { key: "outdoor", entity: this._config.temp_outdoor_entity },
@@ -1109,29 +1180,29 @@ class AlpicairRecuperationCard extends HTMLElement {
       const el = document.createElement("div");
       el.className = "rc-stat";
       el.innerHTML = `
-        <div class="rc-stat-label">${this._t(def.key)}</div>
-        <div class="rc-stat-value">${value !== null && value !== undefined ? `${value}${unit}` : "–"}</div>
+        <span class="rc-stat-label">${this._t(def.key)}</span>
+        <span class="rc-stat-value">${value !== null && value !== undefined ? `${value}${unit}` : "–"}</span>
       `;
       this._els.stats.appendChild(el);
     });
 
-    // target temperature slider (only shown when an entity is configured)
     if (this._config.target_temp_entity) {
       this._els.tempRow.style.display = "";
       this._els.tempLabel.textContent = this._config.target_temp_label || this._t("target_temp");
       this._els.tempSlider.min = this._config.target_temp_min;
       this._els.tempSlider.max = this._config.target_temp_max;
       this._els.tempSlider.step = this._config.target_temp_step;
+      this._els.tempMinLabel.textContent = `${this._config.target_temp_min}°`;
+      this._els.tempMaxLabel.textContent = `${this._config.target_temp_max}°`;
       const current = this._readTargetTemp();
       if (
-        document.activeElement !== this._els.tempSlider &&
+        this.shadowRoot.activeElement !== this._els.tempSlider &&
         current !== null &&
         Number(this._els.tempSlider.value) !== current
       ) {
         this._els.tempSlider.value = current;
       }
-      this._els.tempValue.textContent =
-        current !== null ? `${this._els.tempSlider.value}°` : "–";
+      this._els.tempValue.textContent = current !== null ? `${this._els.tempSlider.value}°` : "–";
     } else {
       this._els.tempRow.style.display = "none";
     }
@@ -1169,7 +1240,7 @@ class AlpicairRecuperationCardSettings extends HTMLElement {
   }
 
   getCardSize() {
-    return this._config && this._config.layout === "wide" ? 2 : 4;
+    return this._config && this._config.layout === "wide" ? 3 : 4;
   }
 
   _lang() {
@@ -1224,13 +1295,8 @@ class AlpicairRecuperationCardSettings extends HTMLElement {
       }
       .rc-note { font-size: 12px; color: var(--rc-muted); margin-top: 12px; line-height: 1.55; }
 
-      /* --- Layout: wide (e.g. NSPanel Pro 120, landscape strip) ----------- */
       :host([data-rc-layout="wide"]) .rc-card { padding: 14px 20px; }
       :host([data-rc-layout="wide"]) .rc-header { margin-bottom: 12px; }
-      :host([data-rc-layout="wide"]) .rc-sections {
-        flex-direction: row; gap: 24px;
-      }
-      :host([data-rc-layout="wide"]) .rc-section { flex: 1 1 0; }
       :host([data-rc-layout="wide"]) .rc-note { margin-top: 10px; }
     `;
 
@@ -1349,19 +1415,26 @@ class AlpicairRecuperationCardSettings extends HTMLElement {
 }
 
 customElements.define("alpicair-recuperation-card", AlpicairRecuperationCard);
+customElements.define("alpicair-recuperation-sensors-card", AlpicairRecuperationSensorsCard);
 customElements.define("alpicair-recuperation-card-settings", AlpicairRecuperationCardSettings);
 
 window.customCards = window.customCards || [];
 window.customCards.push({
   type: "alpicair-recuperation-card",
-  name: "Alpicair Recuperation Card",
-  description: "Modern control card for an Alpicair home ventilation recuperator: modes, fan speed, recuperation %, temperatures.",
+  name: "Alpicair Recuperation — Ring",
+  description: "Square ring gauge for an Alpicair recuperator: recuperation %, fan speed %, tap-to-change mode.",
+  preview: false,
+});
+window.customCards.push({
+  type: "alpicair-recuperation-sensors-card",
+  name: "Alpicair Recuperation — Sensors",
+  description: "Square card with temperatures and a 15-24°C target temperature slider.",
   preview: false,
 });
 window.customCards.push({
   type: "alpicair-recuperation-card-settings",
-  name: "Alpicair Recuperation Card — Settings",
-  description: "Dedicated settings screen for the Alpicair Recuperation Card: language, theme, back button behaviour.",
+  name: "Alpicair Recuperation — Settings",
+  description: "Dedicated settings screen for the Alpicair Recuperation cards: language, theme, back button behaviour.",
   preview: false,
 });
 

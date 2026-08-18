@@ -1,28 +1,27 @@
 # Alpicair Recuperation Card
 
-A modern, friendly Lovelace card for controlling an Alpicair home
-ventilation recuperator (HRV/ERV) in Home Assistant.
+Two modern, friendly square Lovelace cards for controlling an Alpicair
+home ventilation recuperator (HRV/ERV) in Home Assistant, plus a matching
+settings card.
 
-- 5 modes: **Off · Building protection · Economy · Comfort · Boost**
-- A dual progress bar showing **fan speed %** and **recuperation %**, with
-  a subtle pulse while the unit is running — compact and easy to read at a
-  glance
-- Mode buttons laid out as a **2-row grid** (3 + 2) instead of a scrolling
-  row, so every mode is visible without swiping
-- An optional **target temperature slider (15–24 °C)** at the bottom that
-  writes straight to a `climate`, `input_number`, or `number` entity
-- Indoor / outdoor / supply air temperatures (exhaust temperature is
-  intentionally left out)
-- A settings button whose **short press** and **long press** actions you
-  choose (navigate to a page, call a service, open a URL, show more-info…)
-- A separate **settings card** with its own back button (also configurable
-  for short/long press), where the user picks:
+- **Ring card** (`alpicair-recuperation-card`) — a dual ring gauge showing
+  **recuperation %** (outer, amber) and **fan speed %** (inner, teal).
+  The mode icon and name sit in the middle of the ring — **tap it to
+  cycle through Building protection → Economy → Comfort → Boost**. A
+  power icon in the header is a dedicated **off / restore last mode**
+  toggle, and a settings icon opens the settings card (short and long
+  press are both configurable).
+- **Sensors card** (`alpicair-recuperation-sensors-card`) — indoor /
+  outdoor / supply air temperatures, plus an optional **target
+  temperature slider (15–24 °C by default)** that writes straight to a
+  `climate`, `input_number`, or `number` entity. No mode buttons here —
+  mode is controlled entirely from the ring card.
+- **Settings card** (`alpicair-recuperation-card-settings`) — its own
+  back button (short/long press configurable), where the user picks:
   - **Language:** Latviešu / Русский / English
   - **Appearance:** Light / Dark / Match Home Assistant
-- A **visual (UI) editor** for both cards — add them from the dashboard's
-  "Add card" dialog and configure entities, mode mapping, and tap/hold
-  actions with Home Assistant's native form controls. YAML is still
-  supported and always available via "Edit in YAML".
+- A **visual (UI) editor** for all three cards — add them from the
+  dashboard's "Add card" dialog. YAML is still fully supported.
 
 No build step, no dependencies — a single JS file.
 
@@ -40,7 +39,7 @@ No build step, no dependencies — a single JS file.
 > repository to validate its structure — otherwise you'll see an error
 > like `Repository structure for 0.0.1 is not compliant`. After pushing
 > the files, go to **Releases → Create a new release**, tag it e.g.
-> `v1.0.0`, and publish it before adding the repo in HACS.
+> `v2.0.0`, and publish it before adding the repo in HACS.
 
 ### Manual
 
@@ -52,38 +51,24 @@ No build step, no dependencies — a single JS file.
 
 ## Using the visual editor
 
-1. Open a dashboard in edit mode → **Add card** → search for
-   "Alpicair Recuperation".
-2. Pick entities, the mode-switching service, per-mode raw values, and the
-   settings button's tap/hold actions in the form.
-3. Add the settings card the same way and set its back button's tap/hold
-   actions.
+1. Open a dashboard in edit mode → **Add card** → search for "Alpicair
+   Recuperation" — you'll see the ring card, the sensors card, and the
+   settings card.
+2. On the ring card, pick the mode entity, the mode-switching service,
+   the raw per-mode values, and the fan speed / recuperation sensors.
+3. On the sensors card, pick the three temperature sensors and (if you
+   want the slider) a target-temperature entity plus its min/max/step.
+4. On the settings card, set the back button's tap/hold actions.
 
-You can switch to **Edit in YAML** at any point (top-right menu of the
-card editor) — both editors write the same config keys documented below,
-so YAML and UI editing are fully interchangeable.
-
-## Layouts for NSPanel
-
-Both cards support a `layout` option:
-
-- **`square`** (default) — a flexible-height vertical layout for panels
-  closer to 1:1, like **Sonoff NSPanel Pro**.
-- **`wide`** — a fixed **portrait 9:16** layout sized for **Sonoff
-  NSPanel Pro 120** (its screen is physically narrow and tall): the card
-  locks to that aspect ratio and everything — bars, modes, temperatures,
-  the slider — stacks in a single tightened-up column so it fits the
-  panel's screen exactly, without scrolling.
-
-Fonts and touch targets are already sized generously for small in-wall
-displays (larger than a typical dashboard card) in both layouts, so no
-extra scaling is normally needed.
+You can switch to **Edit in YAML** at any point — both editors write the
+same config keys documented below, so YAML and UI editing are fully
+interchangeable.
 
 ## Setting up your entities
 
-The card is generic on purpose so it works with whatever integration
-exposes your recuperator (`select`, `input_select`, MQTT, Modbus, ESPHome…).
-You need:
+The cards are generic on purpose so they work with whatever integration
+exposes your recuperator (`select`, `input_select`, MQTT, Modbus,
+ESPHome…). You need:
 
 | What | Typical entity domain |
 |---|---|
@@ -91,8 +76,9 @@ You need:
 | Fan speed, 0–100 | `sensor.xxx` |
 | Recuperation efficiency, 0–100 | `sensor.xxx` |
 | Indoor / outdoor / supply temperature | `sensor.xxx` |
+| Target temperature (optional) | `climate.xxx`, `input_number.xxx`, or `number.xxx` |
 
-## Main card configuration
+## Ring card configuration
 
 ```yaml
 type: custom:alpicair-recuperation-card
@@ -111,15 +97,6 @@ mode_map:                               # your entity's raw option text for each
 fan_speed_entity: sensor.recuperator_fan_speed
 recuperation_entity: sensor.recuperator_recuperation_efficiency
 
-temp_indoor_entity: sensor.recuperator_room_temperature
-temp_outdoor_entity: sensor.recuperator_outdoor_temperature
-temp_supply_entity: sensor.recuperator_supply_temperature
-
-target_temp_entity: climate.recuperator     # or an input_number / number entity — omit to hide the slider
-target_temp_min: 15
-target_temp_max: 24
-target_temp_step: 1
-
 settings_tap_action:
   action: navigate
   navigation_path: /lovelace/recuperator-settings
@@ -129,8 +106,16 @@ settings_hold_action:
 
 language: auto     # auto | en | ru | lv  — "auto" follows what was chosen in the settings card
 theme: auto         # auto | light | dark — "auto" follows Home Assistant's own dark mode
-layout: square       # square (NSPanel Pro) | wide (NSPanel Pro 120)
+layout: square       # square (NSPanel Pro) | wide (portrait 9:16, NSPanel Pro 120)
 ```
+
+**Mode control:**
+- Tapping the **ring center** cycles Building protection → Economy →
+  Comfort → Boost → Building protection… (skips Off).
+- Tapping the **power icon** in the header is a dedicated shortcut: if
+  the unit is running it switches to Off and remembers the mode you were
+  on; tapping it again restores that mode (or defaults to Building
+  protection if nothing was remembered yet).
 
 `mode_service` also works for an `input_select`
 (`input_select.select_option` / key `option`), or you can point it at
@@ -172,10 +157,29 @@ entity: sensor.recuperator_fan_speed
 action: none
 ```
 
+## Sensors card configuration
+
+```yaml
+type: custom:alpicair-recuperation-sensors-card
+
+temp_indoor_entity: sensor.recuperator_room_temperature
+temp_outdoor_entity: sensor.recuperator_outdoor_temperature
+temp_supply_entity: sensor.recuperator_supply_temperature
+
+target_temp_entity: climate.recuperator     # or an input_number / number entity — omit to hide the slider
+target_temp_min: 15
+target_temp_max: 24
+target_temp_step: 1
+
+language: auto
+theme: auto
+layout: square       # square (NSPanel Pro) | wide (portrait 9:16, NSPanel Pro 120)
+```
+
 ## Settings card configuration
 
 Put this on its own dashboard view (e.g. `/lovelace/recuperator-settings`)
-so the main card's settings button can navigate to it:
+so the ring card's settings button can navigate to it:
 
 ```yaml
 type: custom:alpicair-recuperation-card-settings
@@ -188,16 +192,44 @@ back_hold_action:
   action: navigate
   navigation_path: /lovelace/recuperator-advanced
 
-layout: square       # square (NSPanel Pro) | wide (NSPanel Pro 120)
+layout: square       # square (NSPanel Pro) | wide (portrait 9:16, NSPanel Pro 120)
 ```
 
 Language and theme choices are saved in the browser's local storage and
 are shared by every Alpicair Recuperation card the same browser sees —
 no helper entities required.
 
+## Layouts for NSPanel
+
+All three cards support a `layout` option:
+
+- **`square`** (default) — a 1:1 aspect ratio for panels closer to
+  square, like **Sonoff NSPanel Pro**.
+- **`wide`** — a fixed **portrait 9:16** aspect ratio for tall, narrow
+  panels like **Sonoff NSPanel Pro 120**.
+
+Put the ring card and the sensors card next to each other on the same
+dashboard row (they're both square) so they read as one control panel.
+
+## Full screen on the panel itself
+
+If the card looks small and centered with empty space around it, that's
+Home Assistant's default "Masonry" dashboard view — it always centers
+content. To make a dashboard truly fill an NSPanel's screen:
+
+1. Create a dashboard **view** of type **Panel** and put your card(s) on
+   it (Panel view stretches a single card edge-to-edge — for the two
+   square cards side by side, use a small grid/horizontal-stack card as
+   that one child instead).
+2. Point the panel's browser (NSPanel app, Fully Kiosk, etc.) at that
+   view's specific URL, e.g. `http://ha.local:8123/lovelace/panel-view`,
+   not the generic `/lovelace/0`.
+3. Optionally install the community **kiosk-mode** plugin via HACS to
+   hide Home Assistant's header and sidebar entirely for a true kiosk
+   look.
+
 ## Roadmap
 
-- Visual (GUI) configuration editor
 - Optional sync of language/theme via `input_select` / `input_boolean`
   helpers for multi-device consistency
 - HACS default store submission (see below)
@@ -208,18 +240,18 @@ no helper entities required.
 cd Alpicair-Recuperation
 git init
 git add .
-git commit -m "Initial release: Alpicair Recuperation card"
+git commit -m "Two-card redesign: ring + sensors"
 git branch -M main
 git remote add origin https://github.com/keziksdmitrijs-byte/Alpicair-Recuperation.git
 git push -u origin main
 ```
 
 Then, on GitHub:
-1. Add a repository **description** (e.g. "Modern Lovelace card for an
+1. Add a repository **description** (e.g. "Modern Lovelace cards for an
    Alpicair home ventilation recuperator") — HACS validation can fail on
    an empty description.
 2. Add repo **topics**: `home-assistant`, `hacs`, `lovelace`, `dashboard`.
-3. Create a **Release** (tag e.g. `v1.0.0`) — HACS reads structure from
+3. Create a **Release** (tag e.g. `v2.0.0`) — HACS reads structure from
    releases/tags, and without one it falls back to a placeholder version
    (`0.0.1`) and the "structure is not compliant" error.
 4. Anyone can now add it in HACS as a **custom repository** (see
