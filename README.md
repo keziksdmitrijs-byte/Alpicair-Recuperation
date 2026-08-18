@@ -69,10 +69,11 @@ Both cards support a `layout` option:
 
 - **`square`** (default) — a flexible-height vertical layout for panels
   closer to 1:1, like **Sonoff NSPanel Pro**.
-- **`wide`** — a fixed **16:9** layout sized for **Sonoff NSPanel Pro
-  120**: the card locks to a 16:9 aspect ratio and arranges the bars on
-  the left with modes and temperatures on the right so everything fits
-  the panel's screen exactly, without scrolling.
+- **`wide`** — a fixed **portrait 9:16** layout sized for **Sonoff
+  NSPanel Pro 120** (its screen is physically narrow and tall): the card
+  locks to that aspect ratio and everything — bars, modes, temperatures,
+  the slider — stacks in a single tightened-up column so it fits the
+  panel's screen exactly, without scrolling.
 
 Fonts and touch targets are already sized generously for small in-wall
 displays (larger than a typical dashboard card) in both layouts, so no

@@ -790,28 +790,37 @@ class AlpicairRecuperationCard extends HTMLElement {
       .rc-left { display: flex; flex-direction: column; }
       .rc-right { display: flex; flex-direction: column; }
 
-      /* --- Layout: wide (Sonoff NSPanel Pro 120, fixed 16:9 screen) ------- */
+      /* --- Layout: wide (Sonoff NSPanel Pro 120, tall portrait 9:16 screen)
+         Despite the name, this panel is physically narrow and tall, so the
+         card locks to a 9:16 (portrait) box and everything stacks in a
+         single column, just tightened up to fit the narrower width. ------ */
       :host([data-rc-layout="wide"]) .rc-card {
-        aspect-ratio: 16 / 9; width: 100%; box-sizing: border-box;
-        display: flex; flex-direction: column; padding: 14px 22px;
+        aspect-ratio: 9 / 16; width: 100%; max-width: 340px; box-sizing: border-box;
+        display: flex; flex-direction: column; padding: 16px 14px;
       }
-      :host([data-rc-layout="wide"]) .rc-header { margin-bottom: 8px; flex: 0 0 auto; }
+      :host([data-rc-layout="wide"]) .rc-header { margin-bottom: 12px; flex: 0 0 auto; }
       :host([data-rc-layout="wide"]) .rc-body {
-        flex: 1 1 auto; min-height: 0; flex-direction: row; gap: 22px;
+        flex: 0 0 auto; flex-direction: column; gap: 0;
       }
       :host([data-rc-layout="wide"]) .rc-left {
-        flex: 0 0 34%; justify-content: center; gap: 10px;
+        gap: 10px;
       }
-      :host([data-rc-layout="wide"]) .rc-bars { margin-bottom: 0; justify-content: center; flex: 1 1 auto; }
+      :host([data-rc-layout="wide"]) .rc-bars { margin-bottom: 14px; }
       :host([data-rc-layout="wide"]) .rc-right {
-        flex: 1 1 auto; min-width: 0; justify-content: center; gap: 10px;
+        gap: 12px;
       }
-      :host([data-rc-layout="wide"]) .rc-modes { margin-bottom: 0; }
-      :host([data-rc-layout="wide"]) .rc-mode-btn { padding: 8px 4px 7px; }
-      :host([data-rc-layout="wide"]) .rc-stats { grid-template-columns: repeat(3, 1fr); }
-      :host([data-rc-layout="wide"]) .rc-stat { padding: 8px 6px; }
-      :host([data-rc-layout="wide"]) .rc-stat-value { font-size: 17px; }
-      :host([data-rc-layout="wide"]) .rc-temp-row { flex: 0 0 auto; margin-top: 10px; }
+      :host([data-rc-layout="wide"]) .rc-modes { margin-bottom: 0; gap: 6px; }
+      :host([data-rc-layout="wide"]) .rc-mode-btn { padding: 9px 4px 8px; }
+      :host([data-rc-layout="wide"]) .rc-mode-btn span { font-size: 11px; }
+      :host([data-rc-layout="wide"]) .rc-stats {
+        grid-template-columns: 1fr; gap: 6px;
+      }
+      :host([data-rc-layout="wide"]) .rc-stat {
+        display: flex; align-items: center; justify-content: space-between;
+        text-align: left; padding: 10px 12px;
+      }
+      :host([data-rc-layout="wide"]) .rc-stat-value { margin-top: 0; }
+      :host([data-rc-layout="wide"]) .rc-temp-row { flex: 1 1 auto; margin-top: 16px; display: flex; flex-direction: column; justify-content: flex-end; }
 
       /* --- target temperature slider (both layouts) ----------------------- */
       .rc-temp-row { margin-top: 16px; }
