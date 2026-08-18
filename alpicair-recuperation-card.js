@@ -180,6 +180,7 @@ const RC_STYLES = `
     border-radius: var(--rc-radius);
     padding: 18px 18px 20px;
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    font-size: 16px;
     box-shadow: var(--rc-shadow);
     box-sizing: border-box;
     overflow: hidden;
@@ -391,6 +392,7 @@ class AlpicairRecuperationCardEditor extends RcEditorBase {
       settings_hold_action: this._config.settings_hold_action || { action: "none" },
       language: this._config.language || "auto",
       theme: this._config.theme || "auto",
+      layout: this._config.layout || "square",
     };
   }
 
@@ -472,6 +474,18 @@ class AlpicairRecuperationCardEditor extends RcEditorBase {
               },
             },
           },
+          {
+            name: "layout",
+            selector: {
+              select: {
+                mode: "dropdown",
+                options: [
+                  { value: "square", label: "Square (NSPanel Pro)" },
+                  { value: "wide", label: "Wide (NSPanel Pro 120)" },
+                ],
+              },
+            },
+          },
         ],
       },
     ];
@@ -498,6 +512,7 @@ class AlpicairRecuperationCardEditor extends RcEditorBase {
       settings_hold_action: "Hold",
       language: "Language",
       theme: "Appearance",
+      layout: "Card layout (panel shape)",
     };
     return labels[schema.name] || schema.name;
   }
@@ -508,6 +523,7 @@ class AlpicairRecuperationCardSettingsEditor extends RcEditorBase {
     return {
       back_tap_action: this._config.back_tap_action || { action: "none" },
       back_hold_action: this._config.back_hold_action || { action: "none" },
+      layout: this._config.layout || "square",
     };
   }
 
@@ -523,6 +539,18 @@ class AlpicairRecuperationCardSettingsEditor extends RcEditorBase {
           { name: "back_hold_action", selector: { ui_action: {} } },
         ],
       },
+      {
+        name: "layout",
+        selector: {
+          select: {
+            mode: "dropdown",
+            options: [
+              { value: "square", label: "Square (NSPanel Pro)" },
+              { value: "wide", label: "Wide (NSPanel Pro 120)" },
+            ],
+          },
+        },
+      },
     ];
   }
 
@@ -530,6 +558,7 @@ class AlpicairRecuperationCardSettingsEditor extends RcEditorBase {
     const labels = {
       back_tap_action: "Tap",
       back_hold_action: "Hold",
+      layout: "Card layout (panel shape)",
     };
     return labels[schema.name] || schema.name;
   }
@@ -560,6 +589,7 @@ class AlpicairRecuperationCard extends HTMLElement {
       settings_hold_action: { action: "none" },
       language: "auto",
       theme: "auto",
+      layout: "square",
     };
   }
 
@@ -577,6 +607,7 @@ class AlpicairRecuperationCard extends HTMLElement {
       },
       language: "auto",
       theme: "auto",
+      layout: "square",
       ...config,
     };
     this._built = false;
@@ -590,7 +621,7 @@ class AlpicairRecuperationCard extends HTMLElement {
   }
 
   getCardSize() {
-    return 5;
+    return this._config && this._config.layout === "wide" ? 3 : 5;
   }
 
   connectedCallback() {
@@ -633,13 +664,13 @@ class AlpicairRecuperationCard extends HTMLElement {
         margin-bottom: 10px;
       }
       .rc-title {
-        font-size: 16px; font-weight: 700; letter-spacing: -0.01em;
+        font-size: 19px; font-weight: 700; letter-spacing: -0.01em;
       }
       .rc-status {
-        font-size: 12px; color: var(--rc-muted); margin-top: 1px;
+        font-size: 13px; color: var(--rc-muted); margin-top: 2px;
       }
       .rc-gear {
-        width: 38px; height: 38px; border-radius: 12px;
+        width: 46px; height: 46px; border-radius: 14px;
         display: flex; align-items: center; justify-content: center;
         background: var(--rc-surface-2); cursor: pointer;
         transition: transform var(--rc-transition), background var(--rc-transition);
@@ -647,11 +678,13 @@ class AlpicairRecuperationCard extends HTMLElement {
       }
       .rc-gear:hover { transform: rotate(20deg); }
       .rc-gear:active { transform: rotate(45deg) scale(0.94); }
-      .rc-gear ha-icon { color: var(--rc-muted); --mdc-icon-size: 20px; }
+      .rc-gear ha-icon { color: var(--rc-muted); --mdc-icon-size: 24px; }
 
       .rc-ring-wrap {
         position: relative; width: 168px; height: 168px; margin: 6px auto 14px;
+        transition: width 160ms, height 160ms;
       }
+      .rc-ring-wrap svg { width: 100%; height: 100%; display: block; }
       .rc-ring-wrap.rc-breathing { animation: rc-breathe 4s ease-in-out infinite; }
       @keyframes rc-breathe {
         0%, 100% { transform: scale(1); }
@@ -662,34 +695,34 @@ class AlpicairRecuperationCard extends HTMLElement {
         align-items: center; justify-content: center; text-align: center;
       }
       .rc-ring-center ha-icon {
-        --mdc-icon-size: 26px; margin-bottom: 4px;
+        --mdc-icon-size: 30px; margin-bottom: 5px;
         transition: color var(--rc-transition);
       }
-      .rc-mode-name { font-size: 14px; font-weight: 700; }
-      .rc-mode-sub { font-size: 11px; color: var(--rc-muted); margin-top: 2px; }
+      .rc-mode-name { font-size: 16px; font-weight: 700; }
+      .rc-mode-sub { font-size: 12px; color: var(--rc-muted); margin-top: 2px; }
 
       .rc-legend {
-        display: flex; justify-content: center; gap: 18px; margin-bottom: 14px;
+        display: flex; justify-content: center; gap: 20px; margin-bottom: 0;
       }
-      .rc-legend-item { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--rc-muted); }
-      .rc-legend-dot { width: 8px; height: 8px; border-radius: 50%; }
-      .rc-legend-value { font-weight: 700; font-variant-numeric: tabular-nums; color: var(--rc-text); }
+      .rc-legend-item { display: flex; align-items: center; gap: 7px; font-size: 13px; color: var(--rc-muted); }
+      .rc-legend-dot { width: 10px; height: 10px; border-radius: 50%; }
+      .rc-legend-value { font-weight: 700; font-size: 15px; font-variant-numeric: tabular-nums; color: var(--rc-text); }
 
       .rc-modes {
-        display: flex; gap: 8px; overflow-x: auto; padding-bottom: 4px; margin-bottom: 14px;
+        display: flex; gap: 8px; overflow-x: auto; padding-bottom: 4px; margin-bottom: 0;
         scrollbar-width: none;
       }
       .rc-modes::-webkit-scrollbar { display: none; }
       .rc-mode-btn {
-        flex: 0 0 auto; display: flex; flex-direction: column; align-items: center; gap: 4px;
-        padding: 8px 10px 7px; border-radius: 14px; background: var(--rc-surface);
-        border: 1px solid var(--rc-border); cursor: pointer; min-width: 58px;
+        flex: 0 0 auto; display: flex; flex-direction: column; align-items: center; gap: 5px;
+        padding: 10px 12px 9px; border-radius: 14px; background: var(--rc-surface);
+        border: 1px solid var(--rc-border); cursor: pointer; min-width: 66px;
         transition: box-shadow var(--rc-transition), border-color var(--rc-transition), transform 120ms;
         outline: none;
       }
       .rc-mode-btn:active { transform: scale(0.96); }
-      .rc-mode-btn ha-icon { --mdc-icon-size: 18px; color: var(--rc-muted); }
-      .rc-mode-btn span { font-size: 10px; color: var(--rc-muted); font-weight: 600; }
+      .rc-mode-btn ha-icon { --mdc-icon-size: 22px; color: var(--rc-muted); }
+      .rc-mode-btn span { font-size: 11.5px; color: var(--rc-muted); font-weight: 600; }
       .rc-mode-btn.active {
         border-color: var(--rc-accent); box-shadow: 0 0 0 1px var(--rc-accent), 0 6px 16px -6px var(--rc-accent);
       }
@@ -699,11 +732,40 @@ class AlpicairRecuperationCard extends HTMLElement {
         display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px;
       }
       .rc-stat {
-        background: var(--rc-surface); border-radius: 14px; padding: 10px 8px;
+        background: var(--rc-surface); border-radius: 14px; padding: 11px 8px;
         text-align: center; border: 1px solid var(--rc-border);
       }
-      .rc-stat-label { font-size: 10px; color: var(--rc-muted); font-weight: 600; text-transform: uppercase; letter-spacing: .03em; }
-      .rc-stat-value { font-size: 17px; font-weight: 700; font-variant-numeric: tabular-nums; margin-top: 2px; }
+      .rc-stat-label { font-size: 11px; color: var(--rc-muted); font-weight: 600; text-transform: uppercase; letter-spacing: .03em; }
+      .rc-stat-value { font-size: 20px; font-weight: 700; font-variant-numeric: tabular-nums; margin-top: 3px; }
+
+      /* --- Layout: square (default, e.g. NSPanel Pro) --------------------- */
+      .rc-body { display: flex; flex-direction: column; }
+      .rc-left { display: flex; flex-direction: column; align-items: center; }
+      .rc-right { display: flex; flex-direction: column; gap: 14px; margin-top: 14px; }
+
+      /* --- Layout: wide (e.g. NSPanel Pro 120, landscape strip) ----------- */
+      :host([data-rc-layout="wide"]) .rc-card { padding: 14px 20px; }
+      :host([data-rc-layout="wide"]) .rc-header { margin-bottom: 8px; }
+      :host([data-rc-layout="wide"]) .rc-body {
+        flex-direction: row; align-items: center; gap: 22px;
+      }
+      :host([data-rc-layout="wide"]) .rc-left {
+        flex: 0 0 auto; gap: 10px;
+      }
+      :host([data-rc-layout="wide"]) .rc-ring-wrap {
+        width: 128px; height: 128px; margin: 0;
+      }
+      :host([data-rc-layout="wide"]) .rc-mode-name { font-size: 15px; }
+      :host([data-rc-layout="wide"]) .rc-mode-sub { font-size: 11px; }
+      :host([data-rc-layout="wide"]) .rc-ring-center ha-icon { --mdc-icon-size: 24px; margin-bottom: 3px; }
+      :host([data-rc-layout="wide"]) .rc-legend { flex-direction: column; gap: 6px; align-items: flex-start; }
+      :host([data-rc-layout="wide"]) .rc-right {
+        flex: 1 1 auto; min-width: 0; margin-top: 0; gap: 12px;
+      }
+      :host([data-rc-layout="wide"]) .rc-stats { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+      :host([data-rc-layout="wide"]) .rc-stat { padding: 9px 6px; }
+      :host([data-rc-layout="wide"]) .rc-stat-value { font-size: 18px; }
+      :host([data-rc-layout="wide"]) .rc-mode-btn { min-width: 58px; padding: 8px 10px 7px; }
     `;
 
     const card = document.createElement("div");
@@ -720,38 +782,43 @@ class AlpicairRecuperationCard extends HTMLElement {
         </div>
       </div>
 
-      <div class="rc-ring-wrap" id="rc-ring-wrap">
-        <svg viewBox="0 0 168 168" width="168" height="168">
-          <circle cx="84" cy="84" r="74" fill="none" stroke="var(--rc-surface-2)" stroke-width="10" />
-          <circle id="rc-ring-recup" cx="84" cy="84" r="74" fill="none" stroke="var(--rc-accent-warm)"
-                  stroke-width="10" stroke-linecap="round" transform="rotate(-90 84 84)" />
-          <circle cx="84" cy="84" r="58" fill="none" stroke="var(--rc-surface-2)" stroke-width="10" />
-          <circle id="rc-ring-fan" cx="84" cy="84" r="58" fill="none" stroke="var(--rc-accent-cool)"
-                  stroke-width="10" stroke-linecap="round" transform="rotate(-90 84 84)" />
-        </svg>
-        <div class="rc-ring-center">
-          <ha-icon id="rc-mode-icon" icon="mdi:power"></ha-icon>
-          <div class="rc-mode-name" id="rc-mode-name"></div>
-          <div class="rc-mode-sub" id="rc-mode-sub"></div>
+      <div class="rc-body">
+        <div class="rc-left">
+          <div class="rc-ring-wrap" id="rc-ring-wrap">
+            <svg viewBox="0 0 168 168">
+              <circle cx="84" cy="84" r="74" fill="none" stroke="var(--rc-surface-2)" stroke-width="10" />
+              <circle id="rc-ring-recup" cx="84" cy="84" r="74" fill="none" stroke="var(--rc-accent-warm)"
+                      stroke-width="10" stroke-linecap="round" transform="rotate(-90 84 84)" />
+              <circle cx="84" cy="84" r="58" fill="none" stroke="var(--rc-surface-2)" stroke-width="10" />
+              <circle id="rc-ring-fan" cx="84" cy="84" r="58" fill="none" stroke="var(--rc-accent-cool)"
+                      stroke-width="10" stroke-linecap="round" transform="rotate(-90 84 84)" />
+            </svg>
+            <div class="rc-ring-center">
+              <ha-icon id="rc-mode-icon" icon="mdi:power"></ha-icon>
+              <div class="rc-mode-name" id="rc-mode-name"></div>
+              <div class="rc-mode-sub" id="rc-mode-sub"></div>
+            </div>
+          </div>
+
+          <div class="rc-legend">
+            <div class="rc-legend-item">
+              <span class="rc-legend-dot" style="background: var(--rc-accent-warm)"></span>
+              <span id="rc-legend-recup-label"></span>
+              <span class="rc-legend-value" id="rc-legend-recup-value">–</span>
+            </div>
+            <div class="rc-legend-item">
+              <span class="rc-legend-dot" style="background: var(--rc-accent-cool)"></span>
+              <span id="rc-legend-fan-label"></span>
+              <span class="rc-legend-value" id="rc-legend-fan-value">–</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="rc-right">
+          <div class="rc-modes" id="rc-modes"></div>
+          <div class="rc-stats" id="rc-stats"></div>
         </div>
       </div>
-
-      <div class="rc-legend">
-        <div class="rc-legend-item">
-          <span class="rc-legend-dot" style="background: var(--rc-accent-warm)"></span>
-          <span id="rc-legend-recup-label"></span>
-          <span class="rc-legend-value" id="rc-legend-recup-value">–</span>
-        </div>
-        <div class="rc-legend-item">
-          <span class="rc-legend-dot" style="background: var(--rc-accent-cool)"></span>
-          <span id="rc-legend-fan-label"></span>
-          <span class="rc-legend-value" id="rc-legend-fan-value">–</span>
-        </div>
-      </div>
-
-      <div class="rc-modes" id="rc-modes"></div>
-
-      <div class="rc-stats" id="rc-stats"></div>
     `;
 
     this.shadowRoot.innerHTML = "";
@@ -826,6 +893,7 @@ class AlpicairRecuperationCard extends HTMLElement {
     const lang = this._lang();
     const themeMode = this._themeMode();
     this.setAttribute("data-rc-theme", themeMode);
+    this.setAttribute("data-rc-layout", this._config.layout === "wide" ? "wide" : "square");
 
     const modeKey = this._currentModeKey() || "off";
     const meta = RC_MODE_META[modeKey];
@@ -924,11 +992,12 @@ class AlpicairRecuperationCardSettings extends HTMLElement {
       type: "custom:alpicair-recuperation-card-settings",
       back_tap_action: { action: "navigate", navigation_path: "/lovelace/0" },
       back_hold_action: { action: "none" },
+      layout: "square",
     };
   }
 
   setConfig(config) {
-    this._config = { ...config };
+    this._config = { layout: "square", ...config };
     this._built = false;
     this._render();
   }
@@ -940,7 +1009,7 @@ class AlpicairRecuperationCardSettings extends HTMLElement {
   }
 
   getCardSize() {
-    return 4;
+    return this._config && this._config.layout === "wide" ? 2 : 4;
   }
 
   _lang() {
@@ -967,25 +1036,25 @@ class AlpicairRecuperationCardSettings extends HTMLElement {
 
     const style = document.createElement("style");
     style.textContent = RC_STYLES + `
-      .rc-header { display: flex; align-items: center; gap: 10px; margin-bottom: 18px; }
+      .rc-header { display: flex; align-items: center; gap: 12px; margin-bottom: 20px; }
       .rc-back {
-        width: 38px; height: 38px; border-radius: 12px; display: flex;
+        width: 46px; height: 46px; border-radius: 14px; display: flex;
         align-items: center; justify-content: center; background: var(--rc-surface-2);
         cursor: pointer; outline: none; transition: transform 120ms;
       }
       .rc-back:active { transform: scale(0.92); }
-      .rc-back ha-icon { --mdc-icon-size: 20px; color: var(--rc-muted); }
-      .rc-title { font-size: 17px; font-weight: 700; }
+      .rc-back ha-icon { --mdc-icon-size: 24px; color: var(--rc-muted); }
+      .rc-title { font-size: 19px; font-weight: 700; }
 
-      .rc-section { margin-bottom: 18px; }
+      .rc-sections { display: flex; flex-direction: column; gap: 18px; }
       .rc-section-label {
-        font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em;
-        color: var(--rc-muted); margin-bottom: 8px;
+        font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em;
+        color: var(--rc-muted); margin-bottom: 9px;
       }
-      .rc-pill-row { display: flex; gap: 8px; flex-wrap: wrap; }
+      .rc-pill-row { display: flex; gap: 9px; flex-wrap: wrap; }
       .rc-pill {
-        padding: 9px 16px; border-radius: 999px; background: var(--rc-surface);
-        border: 1px solid var(--rc-border); font-size: 13px; font-weight: 600;
+        padding: 12px 18px; border-radius: 999px; background: var(--rc-surface);
+        border: 1px solid var(--rc-border); font-size: 15px; font-weight: 600;
         color: var(--rc-muted); cursor: pointer; transition: all var(--rc-transition);
         outline: none;
       }
@@ -993,7 +1062,16 @@ class AlpicairRecuperationCardSettings extends HTMLElement {
         color: white; background: linear-gradient(135deg, var(--rc-accent-cool), var(--rc-accent-warm));
         border-color: transparent;
       }
-      .rc-note { font-size: 11px; color: var(--rc-muted); margin-top: 10px; line-height: 1.5; }
+      .rc-note { font-size: 12px; color: var(--rc-muted); margin-top: 12px; line-height: 1.55; }
+
+      /* --- Layout: wide (e.g. NSPanel Pro 120, landscape strip) ----------- */
+      :host([data-rc-layout="wide"]) .rc-card { padding: 14px 20px; }
+      :host([data-rc-layout="wide"]) .rc-header { margin-bottom: 12px; }
+      :host([data-rc-layout="wide"]) .rc-sections {
+        flex-direction: row; gap: 24px;
+      }
+      :host([data-rc-layout="wide"]) .rc-section { flex: 1 1 0; }
+      :host([data-rc-layout="wide"]) .rc-note { margin-top: 10px; }
     `;
 
     const card = document.createElement("div");
@@ -1006,14 +1084,16 @@ class AlpicairRecuperationCardSettings extends HTMLElement {
         <div class="rc-title" id="rc-title"></div>
       </div>
 
-      <div class="rc-section">
-        <div class="rc-section-label" id="rc-lang-label"></div>
-        <div class="rc-pill-row" id="rc-lang-row"></div>
-      </div>
+      <div class="rc-sections">
+        <div class="rc-section">
+          <div class="rc-section-label" id="rc-lang-label"></div>
+          <div class="rc-pill-row" id="rc-lang-row"></div>
+        </div>
 
-      <div class="rc-section">
-        <div class="rc-section-label" id="rc-theme-label"></div>
-        <div class="rc-pill-row" id="rc-theme-row"></div>
+        <div class="rc-section">
+          <div class="rc-section-label" id="rc-theme-label"></div>
+          <div class="rc-pill-row" id="rc-theme-row"></div>
+        </div>
       </div>
 
       <div class="rc-note" id="rc-note"></div>
@@ -1056,6 +1136,7 @@ class AlpicairRecuperationCardSettings extends HTMLElement {
     const lang = this._lang();
     const themeMode = this._themeMode();
     this.setAttribute("data-rc-theme", themeMode);
+    this.setAttribute("data-rc-layout", this._config.layout === "wide" ? "wide" : "square");
 
     this._els.title.textContent = this._t("settings");
     this._els.langLabel.textContent = this._t("language");

@@ -58,6 +58,20 @@ You can switch to **Edit in YAML** at any point (top-right menu of the
 card editor) — both editors write the same config keys documented below,
 so YAML and UI editing are fully interchangeable.
 
+## Layouts for NSPanel
+
+Both cards support a `layout` option:
+
+- **`square`** (default) — a tall, centered layout for square-ish panels
+  like **Sonoff NSPanel Pro**: ring on top, mode pills and stats below.
+- **`wide`** — a compact, landscape layout for elongated panels like
+  **Sonoff NSPanel Pro 120**: ring on the left, modes and stats on the
+  right, everything shorter so it fits the panel's limited height.
+
+Fonts and touch targets are already sized generously for small in-wall
+displays (larger than a typical dashboard card) in both layouts, so no
+extra scaling is normally needed.
+
 ## Setting up your entities
 
 The card is generic on purpose so it works with whatever integration
@@ -103,6 +117,7 @@ settings_hold_action:
 
 language: auto     # auto | en | ru | lv  — "auto" follows what was chosen in the settings card
 theme: auto         # auto | light | dark — "auto" follows Home Assistant's own dark mode
+layout: square       # square (NSPanel Pro) | wide (NSPanel Pro 120)
 ```
 
 `mode_service` also works for an `input_select`
@@ -160,6 +175,8 @@ back_tap_action:
 back_hold_action:
   action: navigate
   navigation_path: /lovelace/recuperator-advanced
+
+layout: square       # square (NSPanel Pro) | wide (NSPanel Pro 120)
 ```
 
 Language and theme choices are saved in the browser's local storage and
