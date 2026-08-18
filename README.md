@@ -9,6 +9,8 @@ ventilation recuperator (HRV/ERV) in Home Assistant.
   glance
 - Mode buttons laid out as a **2-row grid** (3 + 2) instead of a scrolling
   row, so every mode is visible without swiping
+- An optional **target temperature slider (15–24 °C)** at the bottom that
+  writes straight to a `climate`, `input_number`, or `number` entity
 - Indoor / outdoor / supply air temperatures (exhaust temperature is
   intentionally left out)
 - A settings button whose **short press** and **long press** actions you
@@ -63,15 +65,14 @@ so YAML and UI editing are fully interchangeable.
 
 ## Layouts for NSPanel
 
-Both cards support a `layout` option. Both are stacked vertically (top to
-bottom) — the difference is spacing and density, not orientation:
+Both cards support a `layout` option:
 
-- **`square`** (default) — for panels closer to 1:1, like **Sonoff
-  NSPanel Pro**: comfortable spacing throughout.
-- **`wide`** — for tall, narrow panels like **Sonoff NSPanel Pro 120**:
-  tighter padding and the temperature tiles switch from a 3-column grid
-  to a single stacked column (label left, value right) so they stay
-  legible on a narrow screen.
+- **`square`** (default) — a flexible-height vertical layout for panels
+  closer to 1:1, like **Sonoff NSPanel Pro**.
+- **`wide`** — a fixed **16:9** layout sized for **Sonoff NSPanel Pro
+  120**: the card locks to a 16:9 aspect ratio and arranges the bars on
+  the left with modes and temperatures on the right so everything fits
+  the panel's screen exactly, without scrolling.
 
 Fonts and touch targets are already sized generously for small in-wall
 displays (larger than a typical dashboard card) in both layouts, so no
@@ -112,6 +113,11 @@ recuperation_entity: sensor.recuperator_recuperation_efficiency
 temp_indoor_entity: sensor.recuperator_room_temperature
 temp_outdoor_entity: sensor.recuperator_outdoor_temperature
 temp_supply_entity: sensor.recuperator_supply_temperature
+
+target_temp_entity: climate.recuperator     # or an input_number / number entity — omit to hide the slider
+target_temp_min: 15
+target_temp_max: 24
+target_temp_step: 1
 
 settings_tap_action:
   action: navigate

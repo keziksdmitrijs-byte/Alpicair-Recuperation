@@ -39,6 +39,7 @@ const RC_I18N = {
     indoor: "Indoor",
     outdoor: "Outdoor",
     supply: "Supply air",
+    target_temp: "Target temperature",
     off: "Off",
     building_protection: "Building protection",
     economy: "Economy",
@@ -67,6 +68,7 @@ const RC_I18N = {
     indoor: "В доме",
     outdoor: "На улице",
     supply: "Приточный воздух",
+    target_temp: "Целевая температура",
     off: "Выключено",
     building_protection: "Защита здания",
     economy: "Экономия",
@@ -95,6 +97,7 @@ const RC_I18N = {
     indoor: "Telpā",
     outdoor: "Ārā",
     supply: "Pievadītais gaiss",
+    target_temp: "Mērķa temperatūra",
     off: "Izslēgts",
     building_protection: "Ēkas aizsardzība",
     economy: "Ekonomija",
@@ -393,6 +396,10 @@ class AlpicairRecuperationCardEditor extends RcEditorBase {
       language: this._config.language || "auto",
       theme: this._config.theme || "auto",
       layout: this._config.layout || "square",
+      target_temp_entity: this._config.target_temp_entity || "",
+      target_temp_min: this._config.target_temp_min ?? 15,
+      target_temp_max: this._config.target_temp_max ?? 24,
+      target_temp_step: this._config.target_temp_step ?? 1,
     };
   }
 
@@ -441,6 +448,24 @@ class AlpicairRecuperationCardEditor extends RcEditorBase {
         schema: [
           { name: "settings_tap_action", selector: { ui_action: {} } },
           { name: "settings_hold_action", selector: { ui_action: {} } },
+        ],
+      },
+      {
+        type: "expandable",
+        name: "target_temp_group",
+        title: "Target temperature slider",
+        flatten: true,
+        schema: [
+          { name: "target_temp_entity", selector: { entity: { domain: ["climate", "input_number", "number"] } } },
+          {
+            type: "grid",
+            name: "",
+            schema: [
+              { name: "target_temp_min", selector: { number: { mode: "box", step: 0.5 } } },
+              { name: "target_temp_max", selector: { number: { mode: "box", step: 0.5 } } },
+              { name: "target_temp_step", selector: { number: { mode: "box", step: 0.5, min: 0.5 } } },
+            ],
+          },
         ],
       },
       {
@@ -513,6 +538,10 @@ class AlpicairRecuperationCardEditor extends RcEditorBase {
       language: "Language",
       theme: "Appearance",
       layout: "Card layout (panel shape)",
+      target_temp_entity: "Target temperature entity (climate / input_number / number)",
+      target_temp_min: "Min °C",
+      target_temp_max: "Max °C",
+      target_temp_step: "Step °C",
     };
     return labels[schema.name] || schema.name;
   }
@@ -585,6 +614,10 @@ class AlpicairRecuperationCard extends HTMLElement {
       temp_indoor_entity: "",
       temp_outdoor_entity: "",
       temp_supply_entity: "",
+      target_temp_entity: "",
+      target_temp_min: 15,
+      target_temp_max: 24,
+      target_temp_step: 1,
       settings_tap_action: { action: "navigate", navigation_path: "/recuperator-settings" },
       settings_hold_action: { action: "none" },
       language: "auto",
@@ -608,6 +641,9 @@ class AlpicairRecuperationCard extends HTMLElement {
       language: "auto",
       theme: "auto",
       layout: "square",
+      target_temp_min: 15,
+      target_temp_max: 24,
+      target_temp_step: 1,
       ...config,
     };
     this._built = false;
@@ -750,25 +786,60 @@ class AlpicairRecuperationCard extends HTMLElement {
       .rc-stat-value { font-size: 20px; font-weight: 700; font-variant-numeric: tabular-nums; margin-top: 3px; }
 
       /* --- Layout: square (default, e.g. NSPanel Pro, ~1:1 screen) -------- */
-      /* Vertical stack, comfortably spaced. This is the base layout above. */
+      .rc-body { display: flex; flex-direction: column; }
+      .rc-left { display: flex; flex-direction: column; }
+      .rc-right { display: flex; flex-direction: column; }
 
-      /* --- Layout: wide (e.g. NSPanel Pro 120, tall/narrow strip screen) --
-         Still stacked vertically (the panel itself is portrait-shaped and
-         narrow), just tightened up so everything fits a smaller width. --- */
-      :host([data-rc-layout="wide"]) .rc-card { padding: 14px 14px 16px; }
-      :host([data-rc-layout="wide"]) .rc-header { margin-bottom: 12px; }
-      :host([data-rc-layout="wide"]) .rc-bars { margin-bottom: 14px; gap: 10px; }
-      :host([data-rc-layout="wide"]) .rc-modes { margin-bottom: 14px; gap: 6px; }
-      :host([data-rc-layout="wide"]) .rc-mode-btn { padding: 9px 4px 8px; }
-      :host([data-rc-layout="wide"]) .rc-mode-btn span { font-size: 11px; }
-      :host([data-rc-layout="wide"]) .rc-stats {
-        grid-template-columns: 1fr; gap: 6px;
+      /* --- Layout: wide (Sonoff NSPanel Pro 120, fixed 16:9 screen) ------- */
+      :host([data-rc-layout="wide"]) .rc-card {
+        aspect-ratio: 16 / 9; width: 100%; box-sizing: border-box;
+        display: flex; flex-direction: column; padding: 14px 22px;
       }
-      :host([data-rc-layout="wide"]) .rc-stat {
-        display: flex; align-items: center; justify-content: space-between;
-        text-align: left; padding: 10px 12px;
+      :host([data-rc-layout="wide"]) .rc-header { margin-bottom: 8px; flex: 0 0 auto; }
+      :host([data-rc-layout="wide"]) .rc-body {
+        flex: 1 1 auto; min-height: 0; flex-direction: row; gap: 22px;
       }
-      :host([data-rc-layout="wide"]) .rc-stat-value { margin-top: 0; }
+      :host([data-rc-layout="wide"]) .rc-left {
+        flex: 0 0 34%; justify-content: center; gap: 10px;
+      }
+      :host([data-rc-layout="wide"]) .rc-bars { margin-bottom: 0; justify-content: center; flex: 1 1 auto; }
+      :host([data-rc-layout="wide"]) .rc-right {
+        flex: 1 1 auto; min-width: 0; justify-content: center; gap: 10px;
+      }
+      :host([data-rc-layout="wide"]) .rc-modes { margin-bottom: 0; }
+      :host([data-rc-layout="wide"]) .rc-mode-btn { padding: 8px 4px 7px; }
+      :host([data-rc-layout="wide"]) .rc-stats { grid-template-columns: repeat(3, 1fr); }
+      :host([data-rc-layout="wide"]) .rc-stat { padding: 8px 6px; }
+      :host([data-rc-layout="wide"]) .rc-stat-value { font-size: 17px; }
+      :host([data-rc-layout="wide"]) .rc-temp-row { flex: 0 0 auto; margin-top: 10px; }
+
+      /* --- target temperature slider (both layouts) ----------------------- */
+      .rc-temp-row { margin-top: 16px; }
+      .rc-temp-top { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 8px; }
+      .rc-temp-label { font-size: 13px; color: var(--rc-muted); font-weight: 600; }
+      .rc-temp-value { font-size: 20px; font-weight: 700; font-variant-numeric: tabular-nums; color: var(--rc-text); }
+      .rc-temp-slider {
+        -webkit-appearance: none; appearance: none; width: 100%; height: 32px;
+        background: transparent; margin: 0; cursor: pointer;
+      }
+      .rc-temp-slider::-webkit-slider-runnable-track {
+        height: 12px; border-radius: 999px;
+        background: linear-gradient(90deg, var(--rc-accent-cool), var(--rc-accent-warm));
+      }
+      .rc-temp-slider::-webkit-slider-thumb {
+        -webkit-appearance: none; width: 30px; height: 30px; border-radius: 50%;
+        background: #ffffff; border: 3px solid var(--rc-accent-warm);
+        box-shadow: 0 2px 10px rgba(0,0,0,0.28); margin-top: -9px; cursor: pointer;
+      }
+      .rc-temp-slider::-moz-range-track {
+        height: 12px; border-radius: 999px;
+        background: linear-gradient(90deg, var(--rc-accent-cool), var(--rc-accent-warm));
+      }
+      .rc-temp-slider::-moz-range-thumb {
+        width: 30px; height: 30px; border-radius: 50%;
+        background: #ffffff; border: 3px solid var(--rc-accent-warm);
+        box-shadow: 0 2px 10px rgba(0,0,0,0.28); cursor: pointer;
+      }
     `;
 
     const card = document.createElement("div");
@@ -791,32 +862,45 @@ class AlpicairRecuperationCard extends HTMLElement {
         </div>
       </div>
 
-      <div class="rc-bars">
-        <div class="rc-bar-row">
-          <div class="rc-bar-top">
-            <div class="rc-bar-label">
-              <span class="rc-bar-dot" style="background: var(--rc-accent-warm)"></span>
-              <span id="rc-recup-label"></span>
+      <div class="rc-body">
+        <div class="rc-left">
+          <div class="rc-bars">
+            <div class="rc-bar-row">
+              <div class="rc-bar-top">
+                <div class="rc-bar-label">
+                  <span class="rc-bar-dot" style="background: var(--rc-accent-warm)"></span>
+                  <span id="rc-recup-label"></span>
+                </div>
+                <span class="rc-bar-value" id="rc-recup-value">–</span>
+              </div>
+              <div class="rc-bar-track"><div class="rc-bar-fill rc-bar-warm" id="rc-bar-recup"></div></div>
             </div>
-            <span class="rc-bar-value" id="rc-recup-value">–</span>
+            <div class="rc-bar-row">
+              <div class="rc-bar-top">
+                <div class="rc-bar-label">
+                  <span class="rc-bar-dot" style="background: var(--rc-accent-cool)"></span>
+                  <span id="rc-fan-label"></span>
+                </div>
+                <span class="rc-bar-value" id="rc-fan-value">–</span>
+              </div>
+              <div class="rc-bar-track"><div class="rc-bar-fill rc-bar-cool" id="rc-bar-fan"></div></div>
+            </div>
           </div>
-          <div class="rc-bar-track"><div class="rc-bar-fill rc-bar-warm" id="rc-bar-recup"></div></div>
         </div>
-        <div class="rc-bar-row">
-          <div class="rc-bar-top">
-            <div class="rc-bar-label">
-              <span class="rc-bar-dot" style="background: var(--rc-accent-cool)"></span>
-              <span id="rc-fan-label"></span>
-            </div>
-            <span class="rc-bar-value" id="rc-fan-value">–</span>
-          </div>
-          <div class="rc-bar-track"><div class="rc-bar-fill rc-bar-cool" id="rc-bar-fan"></div></div>
+
+        <div class="rc-right">
+          <div class="rc-modes" id="rc-modes"></div>
+          <div class="rc-stats" id="rc-stats"></div>
         </div>
       </div>
 
-      <div class="rc-modes" id="rc-modes"></div>
-
-      <div class="rc-stats" id="rc-stats"></div>
+      <div class="rc-temp-row" id="rc-temp-row" style="display:none;">
+        <div class="rc-temp-top">
+          <span class="rc-temp-label" id="rc-temp-label"></span>
+          <span class="rc-temp-value" id="rc-temp-value">–</span>
+        </div>
+        <input type="range" class="rc-temp-slider" id="rc-temp-slider" min="15" max="24" step="1" />
+      </div>
     `;
 
     this.shadowRoot.innerHTML = "";
@@ -838,11 +922,22 @@ class AlpicairRecuperationCard extends HTMLElement {
       barFan: card.querySelector("#rc-bar-fan"),
       modes: card.querySelector("#rc-modes"),
       stats: card.querySelector("#rc-stats"),
+      tempRow: card.querySelector("#rc-temp-row"),
+      tempLabel: card.querySelector("#rc-temp-label"),
+      tempValue: card.querySelector("#rc-temp-value"),
+      tempSlider: card.querySelector("#rc-temp-slider"),
     };
 
     rcBindPressActions(this._els.gear, {
       onTap: () => rcHandleAction(this, this._hass, this._config.settings_tap_action),
       onHold: () => rcHandleAction(this, this._hass, this._config.settings_hold_action),
+    });
+
+    this._els.tempSlider.addEventListener("input", () => {
+      this._els.tempValue.textContent = `${this._els.tempSlider.value}°`;
+    });
+    this._els.tempSlider.addEventListener("change", () => {
+      this._setTargetTemp(Number(this._els.tempSlider.value));
     });
   }
 
@@ -879,6 +974,54 @@ class AlpicairRecuperationCard extends HTMLElement {
       raw: stateObj.state,
       unit: stateObj.attributes && stateObj.attributes.unit_of_measurement,
     };
+  }
+
+  /** Reads the current target temperature, whatever the entity domain. */
+  _readTargetTemp() {
+    const entityId = this._config.target_temp_entity;
+    if (!this._hass || !entityId) return null;
+    const stateObj = this._hass.states[entityId];
+    if (!stateObj) return null;
+    const domain = entityId.split(".")[0];
+    if (domain === "climate") {
+      const t = stateObj.attributes && stateObj.attributes.temperature;
+      return t === undefined || t === null ? null : Number(t);
+    }
+    const n = Number(stateObj.state);
+    return Number.isNaN(n) ? null : n;
+  }
+
+  /** Commits a new target temperature using the right service for the entity domain. */
+  _setTargetTemp(value) {
+    const entityId = this._config.target_temp_entity;
+    if (!this._hass || !entityId) return;
+    const domain = entityId.split(".")[0];
+    if (this._config.target_temp_service) {
+      const [svcDomain, svcService] = this._config.target_temp_service.split(".");
+      const dataKey = this._config.target_temp_service_data_key || "value";
+      this._hass.callService(svcDomain, svcService, {
+        entity_id: entityId,
+        [dataKey]: value,
+      });
+      return;
+    }
+    if (domain === "climate") {
+      this._hass.callService("climate", "set_temperature", {
+        entity_id: entityId,
+        temperature: value,
+      });
+    } else if (domain === "number") {
+      this._hass.callService("number", "set_value", {
+        entity_id: entityId,
+        value,
+      });
+    } else {
+      // input_number and anything else that speaks this convention
+      this._hass.callService("input_number", "set_value", {
+        entity_id: entityId,
+        value,
+      });
+    }
   }
 
   _update() {
@@ -962,6 +1105,27 @@ class AlpicairRecuperationCard extends HTMLElement {
       `;
       this._els.stats.appendChild(el);
     });
+
+    // target temperature slider (only shown when an entity is configured)
+    if (this._config.target_temp_entity) {
+      this._els.tempRow.style.display = "";
+      this._els.tempLabel.textContent = this._config.target_temp_label || this._t("target_temp");
+      this._els.tempSlider.min = this._config.target_temp_min;
+      this._els.tempSlider.max = this._config.target_temp_max;
+      this._els.tempSlider.step = this._config.target_temp_step;
+      const current = this._readTargetTemp();
+      if (
+        document.activeElement !== this._els.tempSlider &&
+        current !== null &&
+        Number(this._els.tempSlider.value) !== current
+      ) {
+        this._els.tempSlider.value = current;
+      }
+      this._els.tempValue.textContent =
+        current !== null ? `${this._els.tempSlider.value}°` : "–";
+    } else {
+      this._els.tempRow.style.display = "none";
+    }
   }
 }
 
