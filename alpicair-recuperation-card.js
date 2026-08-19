@@ -49,6 +49,11 @@ const RC_I18N = {
     running: "Running",
     stopped: "Stopped",
     tap_hint: "Tap to change",
+    boost_ends_in: "Boost ends in",
+    night_cooling: "Night cooling",
+    fan_speeds: "Fan speeds",
+    supply_fan: "Supply fan",
+    extract_fan: "Extract fan",
     target_temp: "Target temperature",
     language: "Language",
     theme: "Appearance",
@@ -79,6 +84,11 @@ const RC_I18N = {
     running: "Работает",
     stopped: "Остановлен",
     tap_hint: "Нажмите, чтобы сменить",
+    boost_ends_in: "Ускоренный режим закончится через",
+    night_cooling: "Ночное охлаждение",
+    fan_speeds: "Скорости вентиляторов",
+    supply_fan: "Приточный вентилятор",
+    extract_fan: "Вытяжной вентилятор",
     target_temp: "Целевая температура",
     language: "Язык",
     theme: "Оформление",
@@ -109,6 +119,11 @@ const RC_I18N = {
     running: "Darbojas",
     stopped: "Apturēts",
     tap_hint: "Pieskaries, lai mainītu",
+    boost_ends_in: "Paātrinātais režīms beigsies pēc",
+    night_cooling: "Nakts dzesēšana",
+    fan_speeds: "Ventilatoru ātrumi",
+    supply_fan: "Pievada ventilators",
+    extract_fan: "Nosūces ventilators",
     target_temp: "Mērķa temperatūra",
     language: "Valoda",
     theme: "Izskats",
@@ -401,6 +416,7 @@ class AlpicairRecuperationCardEditor extends RcEditorBase {
       recuperation_entity: this._config.recuperation_entity || "",
       mode_service: this._config.mode_service || "select.select_option",
       mode_service_data_key: this._config.mode_service_data_key || "option",
+      boost_timer_entity: this._config.boost_timer_entity || "",
       mode_map: {
         off: "Off",
         building_protection: "Building protection",
@@ -462,6 +478,10 @@ class AlpicairRecuperationCardEditor extends RcEditorBase {
         ],
       },
       {
+        name: "boost_timer_entity",
+        selector: { entity: { domain: ["timer", "sensor"] } },
+      },
+      {
         type: "grid",
         name: "",
         schema: [
@@ -487,6 +507,7 @@ class AlpicairRecuperationCardEditor extends RcEditorBase {
       economy: "Economy",
       comfort: "Comfort",
       boost: "Boost",
+      boost_timer_entity: "Boost countdown timer (timer helper recommended)",
       settings_tap_action: "Tap",
       settings_hold_action: "Hold",
       language: "Language",
@@ -610,9 +631,104 @@ class AlpicairRecuperationCardSettingsEditor extends RcEditorBase {
   }
 }
 
+/* --------------------- editor: device settings card ---------------------- */
+
+const RC_FAN_MODE_LABELS = {
+  building_protection: "Building protection",
+  economy: "Economy",
+  comfort: "Comfort",
+  boost: "Boost",
+};
+
+class AlpicairRecuperationDeviceSettingsCardEditor extends RcEditorBase {
+  formData() {
+    const data = {
+      night_cooling_entity: this._config.night_cooling_entity || "",
+      fan_speed_min: this._config.fan_speed_min ?? 0,
+      fan_speed_max: this._config.fan_speed_max ?? 100,
+      fan_speed_step: this._config.fan_speed_step ?? 5,
+      language: this._config.language || "auto",
+      theme: this._config.theme || "auto",
+      layout: this._config.layout || "square",
+    };
+    RC_ACTIVE_MODES.forEach((mode) => {
+      data[`${mode}_supply_entity`] = this._config[`${mode}_supply_entity`] || "";
+      data[`${mode}_extract_entity`] = this._config[`${mode}_extract_entity`] || "";
+    });
+    return data;
+  }
+
+  formSchema() {
+    const fanDomains = { entity: { domain: ["number", "input_number"] } };
+    return [
+      { name: "night_cooling_entity", selector: { entity: { domain: ["switch", "input_boolean"] } } },
+      ...RC_ACTIVE_MODES.map((mode) => ({
+        type: "expandable",
+        name: `${mode}_group`,
+        title: RC_FAN_MODE_LABELS[mode],
+        flatten: true,
+        schema: [
+          {
+            type: "grid",
+            name: "",
+            schema: [
+              { name: `${mode}_supply_entity`, selector: fanDomains },
+              { name: `${mode}_extract_entity`, selector: fanDomains },
+            ],
+          },
+        ],
+      })),
+      {
+        type: "expandable",
+        name: "fan_range_group",
+        title: "Slider range",
+        flatten: true,
+        schema: [
+          {
+            type: "grid",
+            name: "",
+            schema: [
+              { name: "fan_speed_min", selector: { number: { mode: "box", step: 1 } } },
+              { name: "fan_speed_max", selector: { number: { mode: "box", step: 1 } } },
+              { name: "fan_speed_step", selector: { number: { mode: "box", step: 1, min: 1 } } },
+            ],
+          },
+        ],
+      },
+      {
+        type: "grid",
+        name: "",
+        schema: [
+          { name: "language", selector: RC_LANGUAGE_SELECTOR },
+          { name: "theme", selector: RC_THEME_SELECTOR },
+          { name: "layout", selector: RC_LAYOUT_SELECTOR },
+        ],
+      },
+    ];
+  }
+
+  computeLabel(schema) {
+    const labels = {
+      night_cooling_entity: "Night cooling switch",
+      fan_speed_min: "Min %",
+      fan_speed_max: "Max %",
+      fan_speed_step: "Step %",
+      language: "Language",
+      theme: "Appearance",
+      layout: "Card layout (panel shape)",
+    };
+    RC_ACTIVE_MODES.forEach((mode) => {
+      labels[`${mode}_supply_entity`] = "Supply fan speed entity";
+      labels[`${mode}_extract_entity`] = "Extract fan speed entity";
+    });
+    return labels[schema.name] || schema.name;
+  }
+}
+
 customElements.define("alpicair-recuperation-card-editor", AlpicairRecuperationCardEditor);
 customElements.define("alpicair-recuperation-sensors-card-editor", AlpicairRecuperationSensorsCardEditor);
 customElements.define("alpicair-recuperation-card-settings-editor", AlpicairRecuperationCardSettingsEditor);
+customElements.define("alpicair-recuperation-device-settings-card-editor", AlpicairRecuperationDeviceSettingsCardEditor);
 
 /* ----------------------------------------------------------------------- */
 /*  <alpicair-recuperation-card>  — ring gauge + mode control (square)      */
@@ -629,6 +745,7 @@ class AlpicairRecuperationCard extends HTMLElement {
       mode_entity: "",
       fan_speed_entity: "",
       recuperation_entity: "",
+      boost_timer_entity: "",
       settings_tap_action: { action: "navigate", navigation_path: "/recuperator-settings" },
       settings_hold_action: { action: "none" },
       language: "auto",
@@ -656,6 +773,7 @@ class AlpicairRecuperationCard extends HTMLElement {
     };
     this._built = false;
     this._lastActiveMode = null;
+    this._countdownInterval = null;
     this._render();
   }
 
@@ -676,6 +794,7 @@ class AlpicairRecuperationCard extends HTMLElement {
 
   disconnectedCallback() {
     window.removeEventListener(RC_EVENT_SETTINGS_CHANGED, this._onSettingsChanged);
+    this._stopCountdownTicker();
   }
 
   _lang() {
@@ -705,8 +824,8 @@ class AlpicairRecuperationCard extends HTMLElement {
     style.textContent = RC_STYLES + `
       .rc-card { display: flex; flex-direction: column; }
       .rc-header {
-        display: flex; align-items: center; justify-content: space-between;
-        flex: 0 0 auto; margin-bottom: 10px;
+        display: flex; align-items: center; gap: 12px;
+        flex: 0 0 auto; margin-bottom: 16px;
       }
       .rc-icon-btn {
         width: 42px; height: 42px; border-radius: 13px;
@@ -719,44 +838,56 @@ class AlpicairRecuperationCard extends HTMLElement {
       .rc-icon-btn ha-icon { --mdc-icon-size: 21px; color: var(--rc-muted); }
       .rc-icon-btn.rc-power-on ha-icon { color: #4ADE80; }
       .rc-gear:hover { transform: rotate(20deg); }
-      .rc-title { font-size: 17px; font-weight: 700; letter-spacing: -0.01em; text-align: center; flex: 1 1 auto; }
+      .rc-header-text { flex: 1 1 auto; min-width: 0; }
+      .rc-title { font-size: 17px; font-weight: 700; letter-spacing: -0.01em; }
+      .rc-status { display: flex; align-items: center; gap: 6px; font-size: 14px; color: var(--rc-muted); margin-top: 2px; font-weight: 600; }
+      .rc-status-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--rc-muted); transition: background var(--rc-transition); }
+      .rc-status-dot.rc-on { background: #4ADE80; box-shadow: 0 0 0 3px rgba(74,222,128,0.18); }
 
-      .rc-legend {
-        flex: 0 0 auto; display: flex; justify-content: center; gap: 20px; margin-bottom: 10px; flex-wrap: wrap;
-      }
-      .rc-legend-item { display: flex; align-items: center; gap: 7px; font-size: 13px; color: var(--rc-muted); white-space: nowrap; }
-      .rc-legend-dot { width: 9px; height: 9px; border-radius: 50%; flex: 0 0 auto; }
-      .rc-legend-value { font-weight: 700; font-variant-numeric: tabular-nums; color: var(--rc-text); }
+      .rc-bars { display: flex; flex-direction: column; gap: 12px; margin-bottom: 16px; }
+      .rc-bar-row { display: flex; flex-direction: column; gap: 6px; }
+      .rc-bar-top { display: flex; align-items: baseline; justify-content: space-between; }
+      .rc-bar-label { display: flex; align-items: center; gap: 7px; font-size: 13px; color: var(--rc-muted); font-weight: 600; }
+      .rc-bar-dot { width: 9px; height: 9px; border-radius: 50%; flex: 0 0 auto; }
+      .rc-bar-value { font-size: 16px; font-weight: 700; font-variant-numeric: tabular-nums; color: var(--rc-text); }
+      .rc-bar-track { position: relative; width: 100%; height: 14px; border-radius: 999px; background: var(--rc-surface-2); overflow: hidden; }
+      .rc-bar-fill { position: absolute; inset: 0 auto 0 0; height: 100%; width: 0%; border-radius: 999px; transition: width 420ms cubic-bezier(.4,0,.2,1); }
+      .rc-bar-fill.rc-bar-warm { background: linear-gradient(90deg, var(--rc-accent-warm), #FBCB8A); }
+      .rc-bar-fill.rc-bar-cool { background: linear-gradient(90deg, var(--rc-accent-cool), #8BE7DD); }
+      .rc-bar-fill.rc-breathing { animation: rc-bar-pulse 2.4s ease-in-out infinite; }
+      @keyframes rc-bar-pulse { 0%, 100% { filter: brightness(1); } 50% { filter: brightness(1.18); } }
 
-      .rc-ring-area { flex: 0 0 auto; display: flex; align-items: center; justify-content: center; }
-      .rc-ring-wrap { position: relative; width: 100%; max-width: 280px; aspect-ratio: 1 / 1; margin: 0 auto; }
-      .rc-ring-wrap svg { width: 100%; height: 100%; display: block; }
-      .rc-ring-center {
-        position: absolute; border-radius: 50%; background: var(--rc-surface);
-        display: flex; flex-direction: column; align-items: center; justify-content: center;
-        text-align: center; cursor: pointer; outline: none;
-        transition: background var(--rc-transition);
+      .rc-modes { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; }
+      .rc-mode-btn {
+        display: flex; flex-direction: column; align-items: center; gap: 6px;
+        padding: 14px 8px; border-radius: 14px; background: var(--rc-surface);
+        border: 1px solid var(--rc-border); cursor: pointer;
+        transition: box-shadow var(--rc-transition), border-color var(--rc-transition), transform 120ms;
+        outline: none;
       }
-      .rc-ring-center.rc-breathing { animation: rc-breathe 3.6s ease-in-out infinite; }
-      @keyframes rc-breathe {
-        0%, 100% { transform: scale(1); }
-        50% { transform: scale(1.03); }
+      .rc-mode-btn:active { transform: scale(0.96); }
+      .rc-mode-btn ha-icon { --mdc-icon-size: 22px; color: var(--rc-muted); }
+      .rc-mode-btn span { font-size: 13px; color: var(--rc-muted); font-weight: 600; text-align: center; }
+      .rc-mode-btn.active { border-color: var(--rc-accent); box-shadow: 0 0 0 1px var(--rc-accent), 0 6px 16px -6px var(--rc-accent); }
+      .rc-mode-btn.active ha-icon, .rc-mode-btn.active span { color: var(--rc-accent); }
+
+      .rc-countdown {
+        display: none; align-items: center; gap: 10px; margin-top: 14px;
+        padding: 12px 14px; border-radius: 14px; background: var(--rc-surface);
+        border: 1px solid var(--rc-accent-warm);
       }
-      .rc-ring-center ha-icon { --mdc-icon-size: 30px; margin-bottom: 5px; transition: color var(--rc-transition); }
-      .rc-mode-name { font-size: 18px; font-weight: 700; }
-      .rc-tap-hint {
-        display: flex; align-items: center; gap: 3px; font-size: 10.5px; color: var(--rc-muted);
-        margin-top: 4px;
-      }
-      .rc-tap-hint ha-icon { --mdc-icon-size: 12px; margin: 0; color: var(--rc-muted); }
+      .rc-countdown.rc-show { display: flex; }
+      .rc-countdown ha-icon { --mdc-icon-size: 20px; color: #F4587E; flex: 0 0 auto; }
+      .rc-countdown-text { flex: 1 1 auto; min-width: 0; font-size: 12.5px; color: var(--rc-muted); font-weight: 600; }
+      .rc-countdown-value { font-size: 18px; font-weight: 700; font-variant-numeric: tabular-nums; color: var(--rc-text); flex: 0 0 auto; }
 
       /* --- Layout: wide (Sonoff NSPanel Pro 120, portrait 9:16 screen) ---- */
       :host([data-rc-layout="wide"]) .rc-card {
         aspect-ratio: 9 / 16; max-width: 340px; width: 100%; box-sizing: border-box; padding: 18px 16px;
-        justify-content: center;
       }
-      :host([data-rc-layout="wide"]) .rc-ring-wrap { max-width: 210px; }
-      :host([data-rc-layout="wide"]) .rc-mode-name { font-size: 16px; }
+      :host([data-rc-layout="wide"]) .rc-header { margin-bottom: 12px; }
+      :host([data-rc-layout="wide"]) .rc-bars { margin-bottom: 14px; }
+      :host([data-rc-layout="wide"]) .rc-mode-btn { padding: 11px 6px; }
     `;
 
     const card = document.createElement("div");
@@ -766,41 +897,47 @@ class AlpicairRecuperationCard extends HTMLElement {
         <div class="rc-icon-btn" id="rc-power" tabindex="0" role="button" aria-label="power">
           <ha-icon icon="mdi:power"></ha-icon>
         </div>
-        <div class="rc-title" id="rc-title"></div>
+        <div class="rc-header-text">
+          <div class="rc-title" id="rc-title"></div>
+          <div class="rc-status">
+            <span class="rc-status-dot" id="rc-status-dot"></span>
+            <span id="rc-status-text"></span>
+          </div>
+        </div>
         <div class="rc-icon-btn rc-gear" id="rc-gear" tabindex="0" role="button" aria-label="settings">
           <ha-icon icon="mdi:cog-outline"></ha-icon>
         </div>
       </div>
 
-      <div class="rc-legend">
-        <div class="rc-legend-item">
-          <span class="rc-legend-dot" style="background: var(--rc-accent-warm)"></span>
-          <span id="rc-recup-label"></span>
-          <span class="rc-legend-value" id="rc-recup-value">–</span>
+      <div class="rc-bars">
+        <div class="rc-bar-row">
+          <div class="rc-bar-top">
+            <div class="rc-bar-label">
+              <span class="rc-bar-dot" style="background: var(--rc-accent-warm)"></span>
+              <span id="rc-recup-label"></span>
+            </div>
+            <span class="rc-bar-value" id="rc-recup-value">–</span>
+          </div>
+          <div class="rc-bar-track"><div class="rc-bar-fill rc-bar-warm" id="rc-bar-recup"></div></div>
         </div>
-        <div class="rc-legend-item">
-          <span class="rc-legend-dot" style="background: var(--rc-accent-cool)"></span>
-          <span id="rc-fan-label"></span>
-          <span class="rc-legend-value" id="rc-fan-value">–</span>
+        <div class="rc-bar-row">
+          <div class="rc-bar-top">
+            <div class="rc-bar-label">
+              <span class="rc-bar-dot" style="background: var(--rc-accent-cool)"></span>
+              <span id="rc-fan-label"></span>
+            </div>
+            <span class="rc-bar-value" id="rc-fan-value">–</span>
+          </div>
+          <div class="rc-bar-track"><div class="rc-bar-fill rc-bar-cool" id="rc-bar-fan"></div></div>
         </div>
       </div>
 
-      <div class="rc-ring-area">
-        <div class="rc-ring-wrap" id="rc-ring-wrap">
-          <svg viewBox="0 0 190 190">
-            <circle cx="95" cy="95" r="82" fill="none" stroke="var(--rc-surface-2)" stroke-width="12" />
-            <circle id="rc-ring-recup" cx="95" cy="95" r="82" fill="none" stroke="var(--rc-accent-warm)"
-                    stroke-width="12" stroke-linecap="round" transform="rotate(-90 95 95)" />
-            <circle cx="95" cy="95" r="63" fill="none" stroke="var(--rc-surface-2)" stroke-width="12" />
-            <circle id="rc-ring-fan" cx="95" cy="95" r="63" fill="none" stroke="var(--rc-accent-cool)"
-                    stroke-width="12" stroke-linecap="round" transform="rotate(-90 95 95)" />
-          </svg>
-          <div class="rc-ring-center" id="rc-ring-center" style="inset: 20%;" tabindex="0" role="button" aria-label="change mode">
-            <ha-icon id="rc-mode-icon" icon="mdi:power"></ha-icon>
-            <div class="rc-mode-name" id="rc-mode-name"></div>
-            <div class="rc-tap-hint"><ha-icon icon="mdi:gesture-tap"></ha-icon><span id="rc-tap-hint-text"></span></div>
-          </div>
-        </div>
+      <div class="rc-modes" id="rc-modes"></div>
+
+      <div class="rc-countdown" id="rc-countdown">
+        <ha-icon icon="mdi:timer-sand"></ha-icon>
+        <span class="rc-countdown-text" id="rc-countdown-text"></span>
+        <span class="rc-countdown-value" id="rc-countdown-value">–</span>
       </div>
     `;
 
@@ -812,17 +949,18 @@ class AlpicairRecuperationCard extends HTMLElement {
       title: card.querySelector("#rc-title"),
       power: card.querySelector("#rc-power"),
       gear: card.querySelector("#rc-gear"),
-      ringWrap: card.querySelector("#rc-ring-wrap"),
-      ringRecup: card.querySelector("#rc-ring-recup"),
-      ringFan: card.querySelector("#rc-ring-fan"),
-      ringCenter: card.querySelector("#rc-ring-center"),
-      modeIcon: card.querySelector("#rc-mode-icon"),
-      modeName: card.querySelector("#rc-mode-name"),
-      tapHintText: card.querySelector("#rc-tap-hint-text"),
+      statusDot: card.querySelector("#rc-status-dot"),
+      statusText: card.querySelector("#rc-status-text"),
       recupLabel: card.querySelector("#rc-recup-label"),
       recupValue: card.querySelector("#rc-recup-value"),
       fanLabel: card.querySelector("#rc-fan-label"),
       fanValue: card.querySelector("#rc-fan-value"),
+      barRecup: card.querySelector("#rc-bar-recup"),
+      barFan: card.querySelector("#rc-bar-fan"),
+      modes: card.querySelector("#rc-modes"),
+      countdown: card.querySelector("#rc-countdown"),
+      countdownText: card.querySelector("#rc-countdown-text"),
+      countdownValue: card.querySelector("#rc-countdown-value"),
     };
 
     rcBindPressActions(this._els.gear, {
@@ -837,17 +975,6 @@ class AlpicairRecuperationCard extends HTMLElement {
         this._toggleOff();
       }
     });
-
-    this._els.ringCenter.addEventListener("click", () => this._cycleMode());
-    this._els.ringCenter.addEventListener("keydown", (ev) => {
-      if (ev.key === "Enter" || ev.key === " ") {
-        ev.preventDefault();
-        this._cycleMode();
-      }
-    });
-
-    this._circRecup = 2 * Math.PI * 82;
-    this._circFan = 2 * Math.PI * 63;
   }
 
   _currentModeKey() {
@@ -884,13 +1011,11 @@ class AlpicairRecuperationCard extends HTMLElement {
   }
 
   /**
-   * Only cycle through modes that actually exist on the target entity.
-   * For `select`/`input_select` entities Home Assistant exposes the valid
-   * choices as the `options` attribute — if it's present, any RC_ACTIVE_MODES
-   * entry whose mapped raw value isn't in that list is skipped instead of
-   * being sent as an (invalid, silently rejected) service call. This is what
-   * makes a 4-state device (no "Boost" tier, for example) work correctly
-   * without extra configuration.
+   * Only offer modes that actually exist on the target entity. For
+   * `select`/`input_select` entities Home Assistant exposes the valid
+   * choices as the `options` attribute — if present, any RC_ACTIVE_MODES
+   * entry whose mapped raw value isn't in that list is hidden instead of
+   * being offered as a (invalid, silently rejected) button.
    */
   _availableActiveModes() {
     if (!this._hass || !this._config.mode_entity) return RC_ACTIVE_MODES;
@@ -914,20 +1039,6 @@ class AlpicairRecuperationCard extends HTMLElement {
     }
   }
 
-  /** Ring center: cycles through the running modes that exist on this entity (off excluded). */
-  _cycleMode() {
-    const active = this._availableActiveModes();
-    const current = this._currentModeKey();
-    if (!current || current === "off" || !active.includes(current)) {
-      this._setModeKey(active[0]);
-      return;
-    }
-    const idx = active.indexOf(current);
-    const next = active[(idx + 1) % active.length];
-    this._setModeKey(next);
-  }
-
-
   _readNumberState(entityId) {
     if (!this._hass || !entityId) return null;
     const stateObj = this._hass.states[entityId];
@@ -935,27 +1046,103 @@ class AlpicairRecuperationCard extends HTMLElement {
     return { value: rcClampPercent(stateObj.state) };
   }
 
+  /* ------------------------- boost countdown ------------------------- */
+
+  _stopCountdownTicker() {
+    if (this._countdownInterval) {
+      clearInterval(this._countdownInterval);
+      this._countdownInterval = null;
+    }
+  }
+
+  _startCountdownTicker() {
+    if (this._countdownInterval) return;
+    this._countdownInterval = setInterval(() => this._renderCountdown(), 1000);
+  }
+
+  _parseHms(str) {
+    const parts = String(str).split(":").map(Number);
+    if (parts.some((n) => Number.isNaN(n))) return null;
+    if (parts.length === 3) return parts[0] * 3600 + parts[1] * 60 + parts[2];
+    if (parts.length === 2) return parts[0] * 60 + parts[1];
+    return parts[0];
+  }
+
+  _formatMmSs(totalSeconds) {
+    const s = Math.max(0, Math.round(totalSeconds));
+    const h = Math.floor(s / 3600);
+    const m = Math.floor((s % 3600) / 60);
+    const sec = s % 60;
+    const pad = (n) => String(n).padStart(2, "0");
+    return h > 0 ? `${h}:${pad(m)}:${pad(sec)}` : `${m}:${pad(sec)}`;
+  }
+
+  _renderCountdown() {
+    if (!this._els) return;
+    const entityId = this._config.boost_timer_entity;
+    const modeKey = this._currentModeKey();
+
+    if (!entityId || !this._hass || modeKey !== "boost") {
+      this._els.countdown.classList.remove("rc-show");
+      this._stopCountdownTicker();
+      return;
+    }
+
+    const stateObj = this._hass.states[entityId];
+    if (!stateObj) {
+      this._els.countdown.classList.remove("rc-show");
+      this._stopCountdownTicker();
+      return;
+    }
+
+    const domain = entityId.split(".")[0];
+    let secondsLeft = null;
+
+    if (domain === "timer") {
+      if (stateObj.state !== "active") {
+        this._els.countdown.classList.remove("rc-show");
+        this._stopCountdownTicker();
+        return;
+      }
+      const finishesAt = stateObj.attributes.finishes_at;
+      if (finishesAt) {
+        secondsLeft = Math.max(0, Math.round((new Date(finishesAt).getTime() - Date.now()) / 1000));
+        this._startCountdownTicker();
+      } else if (stateObj.attributes.remaining) {
+        secondsLeft = this._parseHms(stateObj.attributes.remaining);
+        this._stopCountdownTicker();
+      }
+    } else {
+      const n = Number(stateObj.state);
+      secondsLeft = Number.isNaN(n) ? null : n;
+      this._stopCountdownTicker();
+    }
+
+    if (secondsLeft === null) {
+      this._els.countdown.classList.remove("rc-show");
+      return;
+    }
+
+    this._els.countdown.classList.add("rc-show");
+    this._els.countdownText.textContent = this._t("boost_ends_in");
+    this._els.countdownValue.textContent = this._formatMmSs(secondsLeft);
+  }
+
   _update() {
     if (!this._hass || !this._els) return;
+    const lang = this._lang();
     const themeMode = this._themeMode();
     this.setAttribute("data-rc-theme", themeMode);
     this.setAttribute("data-rc-layout", this._config.layout === "wide" ? "wide" : "square");
 
     const modeKey = this._currentModeKey() || "off";
-    const meta = RC_MODE_META[modeKey];
     const running = modeKey !== "off";
     if (running) this._lastActiveMode = modeKey;
 
     this._els.title.textContent = this._config.title || this._t("title");
-
     this._els.power.classList.toggle("rc-power-on", running);
-
-    this._els.modeIcon.setAttribute("icon", meta.icon);
-    this._els.modeIcon.style.color = meta.accent;
-    this._els.modeName.textContent = this._t(modeKey);
-    this._els.modeName.style.color = meta.accent;
-    this._els.tapHintText.textContent = this._t("tap_hint");
-    this._els.ringCenter.classList.toggle("rc-breathing", running);
+    this._els.statusDot.classList.toggle("rc-on", running);
+    this._els.statusText.textContent = `${this._t(modeKey)} · ${running ? this._t("running") : this._t("stopped")}`;
 
     const fan = this._readNumberState(this._config.fan_speed_entity);
     const recup = this._readNumberState(this._config.recuperation_entity);
@@ -967,16 +1154,43 @@ class AlpicairRecuperationCard extends HTMLElement {
 
     const recupPct = recup && recup.value !== null ? recup.value : 0;
     const fanPct = fan && fan.value !== null ? fan.value : 0;
-    this._els.ringRecup.setAttribute(
-      "stroke-dasharray",
-      `${(recupPct / 100) * this._circRecup} ${this._circRecup}`
-    );
-    this._els.ringFan.setAttribute(
-      "stroke-dasharray",
-      `${(fanPct / 100) * this._circFan} ${this._circFan}`
-    );
+    this._els.barRecup.style.width = `${recupPct}%`;
+    this._els.barFan.style.width = `${fanPct}%`;
+    this._els.barRecup.classList.toggle("rc-breathing", running);
+    this._els.barFan.classList.toggle("rc-breathing", running);
+
+    // mode buttons (rebuild only when the language changes)
+    const active = this._availableActiveModes();
+    const modeSignature = `${lang}:${active.join(",")}`;
+    if (this._els.modes.dataset.sig !== modeSignature) {
+      this._els.modes.dataset.sig = modeSignature;
+      this._els.modes.innerHTML = "";
+      active.forEach((key) => {
+        const btn = document.createElement("div");
+        btn.className = "rc-mode-btn";
+        btn.tabIndex = 0;
+        btn.setAttribute("role", "button");
+        btn.dataset.mode = key;
+        btn.style.setProperty("--rc-accent", RC_MODE_META[key].accent);
+        btn.innerHTML = `<ha-icon icon="${RC_MODE_META[key].icon}"></ha-icon><span>${rcT(lang, key)}</span>`;
+        btn.addEventListener("click", () => this._setModeKey(key));
+        btn.addEventListener("keydown", (ev) => {
+          if (ev.key === "Enter" || ev.key === " ") {
+            ev.preventDefault();
+            this._setModeKey(key);
+          }
+        });
+        this._els.modes.appendChild(btn);
+      });
+    }
+    [...this._els.modes.children].forEach((btn) => {
+      btn.classList.toggle("active", btn.dataset.mode === modeKey);
+    });
+
+    this._renderCountdown();
   }
 }
+
 
 /* ----------------------------------------------------------------------- */
 /*  <alpicair-recuperation-sensors-card> — temperatures + target temp       */
@@ -1446,15 +1660,306 @@ class AlpicairRecuperationCardSettings extends HTMLElement {
   }
 }
 
+/* ----------------------------------------------------------------------- */
+/*  <alpicair-recuperation-device-settings-card>                            */
+/*  Night cooling toggle + 8 fan speed sliders (supply/extract × 4 modes)   */
+/* ----------------------------------------------------------------------- */
+
+class AlpicairRecuperationDeviceSettingsCard extends HTMLElement {
+  static getConfigElement() {
+    return document.createElement("alpicair-recuperation-device-settings-card-editor");
+  }
+
+  static getStubConfig() {
+    return {
+      type: "custom:alpicair-recuperation-device-settings-card",
+      night_cooling_entity: "",
+      fan_speed_min: 0,
+      fan_speed_max: 100,
+      fan_speed_step: 5,
+      language: "auto",
+      theme: "auto",
+      layout: "square",
+    };
+  }
+
+  setConfig(config) {
+    if (!config) throw new Error("Invalid configuration");
+    this._config = {
+      language: "auto",
+      theme: "auto",
+      layout: "square",
+      fan_speed_min: 0,
+      fan_speed_max: 100,
+      fan_speed_step: 5,
+      ...config,
+    };
+    this._built = false;
+    this._render();
+  }
+
+  set hass(hass) {
+    this._hass = hass;
+    if (!this._built) this._render();
+    this._update();
+  }
+
+  getCardSize() {
+    return 8;
+  }
+
+  connectedCallback() {
+    this._onSettingsChanged = () => this._update();
+    window.addEventListener(RC_EVENT_SETTINGS_CHANGED, this._onSettingsChanged);
+  }
+
+  disconnectedCallback() {
+    window.removeEventListener(RC_EVENT_SETTINGS_CHANGED, this._onSettingsChanged);
+  }
+
+  _lang() {
+    return rcGetLang(this._config && this._config.language);
+  }
+
+  _t(key) {
+    return rcT(this._lang(), key);
+  }
+
+  _themeMode() {
+    const t = rcGetTheme(this._config && this._config.theme);
+    if (t === "auto") {
+      return this._hass && this._hass.themes && this._hass.themes.darkMode ? "dark" : "light";
+    }
+    return t;
+  }
+
+  _render() {
+    if (!this._config) return;
+    this._built = true;
+
+    this.innerHTML = "";
+    this.attachShadow({ mode: "open" });
+
+    const style = document.createElement("style");
+    style.textContent = RC_STYLES + `
+      .rc-card { display: flex; flex-direction: column; gap: 18px; }
+
+      .rc-toggle-row {
+        display: flex; align-items: center; gap: 12px; padding: 14px 16px;
+        border-radius: 14px; background: var(--rc-surface); border: 1px solid var(--rc-border);
+        cursor: pointer; outline: none; transition: border-color var(--rc-transition);
+      }
+      .rc-toggle-row.rc-on { border-color: var(--rc-accent-cool); }
+      .rc-toggle-icon {
+        width: 38px; height: 38px; border-radius: 12px; flex: 0 0 auto;
+        display: flex; align-items: center; justify-content: center;
+        background: var(--rc-surface-2);
+      }
+      .rc-toggle-row.rc-on .rc-toggle-icon { background: var(--rc-accent-cool); }
+      .rc-toggle-icon ha-icon { --mdc-icon-size: 20px; color: var(--rc-muted); }
+      .rc-toggle-row.rc-on .rc-toggle-icon ha-icon { color: #0B2521; }
+      .rc-toggle-label { flex: 1 1 auto; font-size: 15px; font-weight: 600; }
+      .rc-toggle-switch {
+        width: 46px; height: 27px; border-radius: 999px; background: var(--rc-surface-2);
+        position: relative; flex: 0 0 auto; transition: background var(--rc-transition);
+      }
+      .rc-toggle-row.rc-on .rc-toggle-switch { background: var(--rc-accent-cool); }
+      .rc-toggle-switch::after {
+        content: ""; position: absolute; top: 3px; left: 3px; width: 21px; height: 21px;
+        border-radius: 50%; background: #fff; transition: transform var(--rc-transition);
+        box-shadow: 0 1px 4px rgba(0,0,0,0.3);
+      }
+      .rc-toggle-row.rc-on .rc-toggle-switch::after { transform: translateX(19px); }
+
+      .rc-mode-section { display: flex; flex-direction: column; gap: 10px; }
+      .rc-mode-title { display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 700; color: var(--rc-text); }
+      .rc-mode-title ha-icon { --mdc-icon-size: 17px; }
+      .rc-fan-slider { display: flex; flex-direction: column; gap: 5px; margin-bottom: 8px; }
+      .rc-fan-top { display: flex; justify-content: space-between; align-items: baseline; }
+      .rc-fan-label { font-size: 12.5px; color: var(--rc-muted); font-weight: 600; }
+      .rc-fan-value { font-size: 15px; font-weight: 700; font-variant-numeric: tabular-nums; color: var(--rc-text); }
+      .rc-fan-input {
+        -webkit-appearance: none; appearance: none; width: 100%; height: 26px;
+        background: transparent; margin: 0; cursor: pointer;
+      }
+      .rc-fan-input::-webkit-slider-runnable-track {
+        height: 9px; border-radius: 999px; background: var(--rc-surface-2);
+      }
+      .rc-fan-input.rc-fan-supply::-webkit-slider-runnable-track { background: linear-gradient(90deg, var(--rc-surface-2), var(--rc-accent-cool)); }
+      .rc-fan-input.rc-fan-extract::-webkit-slider-runnable-track { background: linear-gradient(90deg, var(--rc-surface-2), var(--rc-accent-warm)); }
+      .rc-fan-input::-webkit-slider-thumb {
+        -webkit-appearance: none; width: 22px; height: 22px; border-radius: 50%;
+        background: #fff; border: 3px solid var(--rc-accent-cool); margin-top: -7px; cursor: pointer;
+        box-shadow: 0 1px 6px rgba(0,0,0,0.25);
+      }
+      .rc-fan-input.rc-fan-extract::-webkit-slider-thumb { border-color: var(--rc-accent-warm); }
+      .rc-fan-input::-moz-range-track { height: 9px; border-radius: 999px; background: var(--rc-surface-2); }
+      .rc-fan-input::-moz-range-thumb {
+        width: 22px; height: 22px; border-radius: 50%; background: #fff;
+        border: 3px solid var(--rc-accent-cool); cursor: pointer; box-shadow: 0 1px 6px rgba(0,0,0,0.25);
+      }
+      .rc-fan-input.rc-fan-extract::-moz-range-thumb { border-color: var(--rc-accent-warm); }
+
+      .rc-mode-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px 20px; }
+
+      /* --- Layout: wide (Sonoff NSPanel Pro 120, portrait 9:16 screen) ---- */
+      :host([data-rc-layout="wide"]) .rc-mode-grid { grid-template-columns: 1fr; }
+    `;
+
+    const card = document.createElement("div");
+    card.className = "rc-card";
+    card.innerHTML = `
+      <div class="rc-toggle-row" id="rc-night-cooling" tabindex="0" role="switch" aria-label="night cooling">
+        <div class="rc-toggle-icon"><ha-icon icon="mdi:weather-night"></ha-icon></div>
+        <div class="rc-toggle-label" id="rc-night-cooling-label"></div>
+        <div class="rc-toggle-switch"></div>
+      </div>
+
+      <div class="rc-mode-grid" id="rc-mode-grid"></div>
+    `;
+
+    this.shadowRoot.innerHTML = "";
+    this.shadowRoot.appendChild(style);
+    this.shadowRoot.appendChild(card);
+
+    this._els = {
+      nightCooling: card.querySelector("#rc-night-cooling"),
+      nightCoolingLabel: card.querySelector("#rc-night-cooling-label"),
+      modeGrid: card.querySelector("#rc-mode-grid"),
+    };
+
+    this._els.nightCooling.addEventListener("click", () => this._toggleNightCooling());
+    this._els.nightCooling.addEventListener("keydown", (ev) => {
+      if (ev.key === "Enter" || ev.key === " ") {
+        ev.preventDefault();
+        this._toggleNightCooling();
+      }
+    });
+  }
+
+  _toggleNightCooling() {
+    const entityId = this._config.night_cooling_entity;
+    if (!this._hass || !entityId) return;
+    const domain = entityId.split(".")[0];
+    this._hass.callService(domain, "toggle", { entity_id: entityId });
+  }
+
+  _setFanSpeed(entityId, value) {
+    if (!this._hass || !entityId) return;
+    const domain = entityId.split(".")[0];
+    if (domain === "number") {
+      this._hass.callService("number", "set_value", { entity_id: entityId, value });
+    } else {
+      this._hass.callService("input_number", "set_value", { entity_id: entityId, value });
+    }
+  }
+
+  _readValue(entityId) {
+    if (!this._hass || !entityId) return null;
+    const stateObj = this._hass.states[entityId];
+    if (!stateObj) return null;
+    const n = Number(stateObj.state);
+    return Number.isNaN(n) ? null : n;
+  }
+
+  _buildModeGrid() {
+    const lang = this._lang();
+    this._els.modeGrid.dataset.lang = lang;
+    this._els.modeGrid.innerHTML = "";
+    this._fanInputs = {};
+
+    RC_ACTIVE_MODES.forEach((mode) => {
+      const section = document.createElement("div");
+      section.className = "rc-mode-section";
+
+      const title = document.createElement("div");
+      title.className = "rc-mode-title";
+      title.innerHTML = `<ha-icon icon="${RC_MODE_META[mode].icon}" style="color:${RC_MODE_META[mode].accent}"></ha-icon><span>${rcT(lang, mode)}</span>`;
+      section.appendChild(title);
+
+      [
+        { kind: "supply", labelKey: "supply_fan", cls: "rc-fan-supply" },
+        { kind: "extract", labelKey: "extract_fan", cls: "rc-fan-extract" },
+      ].forEach(({ kind, labelKey, cls }) => {
+        const entityKey = `${mode}_${kind}_entity`;
+        const wrap = document.createElement("div");
+        wrap.className = "rc-fan-slider";
+        wrap.innerHTML = `
+          <div class="rc-fan-top">
+            <span class="rc-fan-label">${rcT(lang, labelKey)}</span>
+            <span class="rc-fan-value" data-value-for="${entityKey}">–</span>
+          </div>
+          <input type="range" class="rc-fan-input ${cls}" data-entity-key="${entityKey}"
+                 min="${this._config.fan_speed_min}" max="${this._config.fan_speed_max}" step="${this._config.fan_speed_step}" />
+        `;
+        const input = wrap.querySelector("input");
+        const valueEl = wrap.querySelector(`[data-value-for="${entityKey}"]`);
+        this._fanInputs[entityKey] = { input, valueEl };
+
+        input.addEventListener("input", () => {
+          valueEl.textContent = `${input.value}%`;
+        });
+        input.addEventListener("change", () => {
+          this._setFanSpeed(this._config[entityKey], Number(input.value));
+        });
+
+        section.appendChild(wrap);
+      });
+
+      this._els.modeGrid.appendChild(section);
+    });
+  }
+
+  _update() {
+    if (!this._hass || !this._els) return;
+    const lang = this._lang();
+    const themeMode = this._themeMode();
+    this.setAttribute("data-rc-theme", themeMode);
+    this.setAttribute("data-rc-layout", this._config.layout === "wide" ? "wide" : "square");
+
+    this._els.nightCoolingLabel.textContent = this._t("night_cooling");
+    const ncEntity = this._config.night_cooling_entity;
+    const ncOn = ncEntity && this._hass.states[ncEntity] && this._hass.states[ncEntity].state === "on";
+    this._els.nightCooling.classList.toggle("rc-on", !!ncOn);
+
+    if (this._els.modeGrid.dataset.lang !== lang) {
+      this._buildModeGrid();
+    }
+
+    RC_ACTIVE_MODES.forEach((mode) => {
+      ["supply", "extract"].forEach((kind) => {
+        const entityKey = `${mode}_${kind}_entity`;
+        const entityId = this._config[entityKey];
+        const refs = this._fanInputs && this._fanInputs[entityKey];
+        if (!refs) return;
+        refs.input.min = this._config.fan_speed_min;
+        refs.input.max = this._config.fan_speed_max;
+        refs.input.step = this._config.fan_speed_step;
+        const value = this._readValue(entityId);
+        if (
+          this.shadowRoot.activeElement !== refs.input &&
+          value !== null &&
+          Number(refs.input.value) !== value
+        ) {
+          refs.input.value = value;
+        }
+        refs.valueEl.textContent = value !== null ? `${refs.input.value}%` : "–";
+      });
+    });
+  }
+}
+
+
 customElements.define("alpicair-recuperation-card", AlpicairRecuperationCard);
 customElements.define("alpicair-recuperation-sensors-card", AlpicairRecuperationSensorsCard);
 customElements.define("alpicair-recuperation-card-settings", AlpicairRecuperationCardSettings);
+customElements.define("alpicair-recuperation-device-settings-card", AlpicairRecuperationDeviceSettingsCard);
 
 window.customCards = window.customCards || [];
 window.customCards.push({
   type: "alpicair-recuperation-card",
-  name: "Alpicair Recuperation — Ring",
-  description: "Square ring gauge for an Alpicair recuperator: recuperation %, fan speed %, tap-to-change mode.",
+  name: "Alpicair Recuperation — Main",
+  description: "Square card for an Alpicair recuperator: recuperation % / fan speed % bars, mode buttons, boost countdown.",
   preview: false,
 });
 window.customCards.push({
@@ -1467,6 +1972,12 @@ window.customCards.push({
   type: "alpicair-recuperation-card-settings",
   name: "Alpicair Recuperation — Settings",
   description: "Dedicated settings screen for the Alpicair Recuperation cards: language, theme, back button behaviour.",
+  preview: false,
+});
+window.customCards.push({
+  type: "alpicair-recuperation-device-settings-card",
+  name: "Alpicair Recuperation — Device settings",
+  description: "Night cooling toggle and 8 fan speed sliders (supply/extract × 4 modes).",
   preview: false,
 });
 
