@@ -703,10 +703,10 @@ class AlpicairRecuperationCard extends HTMLElement {
 
     const style = document.createElement("style");
     style.textContent = RC_STYLES + `
-      .rc-card { aspect-ratio: 1 / 1; display: flex; flex-direction: column; }
+      .rc-card { display: flex; flex-direction: column; }
       .rc-header {
         display: flex; align-items: center; justify-content: space-between;
-        flex: 0 0 auto; margin-bottom: 12px;
+        flex: 0 0 auto; margin-bottom: 10px;
       }
       .rc-icon-btn {
         width: 42px; height: 42px; border-radius: 13px;
@@ -721,8 +721,15 @@ class AlpicairRecuperationCard extends HTMLElement {
       .rc-gear:hover { transform: rotate(20deg); }
       .rc-title { font-size: 17px; font-weight: 700; letter-spacing: -0.01em; text-align: center; flex: 1 1 auto; }
 
-      .rc-ring-area { flex: 1 1 auto; display: flex; align-items: center; justify-content: center; min-height: 0; }
-      .rc-ring-wrap { position: relative; width: 100%; height: 100%; max-width: 220px; max-height: 220px; }
+      .rc-legend {
+        flex: 0 0 auto; display: flex; justify-content: center; gap: 20px; margin-bottom: 10px; flex-wrap: wrap;
+      }
+      .rc-legend-item { display: flex; align-items: center; gap: 7px; font-size: 13px; color: var(--rc-muted); white-space: nowrap; }
+      .rc-legend-dot { width: 9px; height: 9px; border-radius: 50%; flex: 0 0 auto; }
+      .rc-legend-value { font-weight: 700; font-variant-numeric: tabular-nums; color: var(--rc-text); }
+
+      .rc-ring-area { flex: 0 0 auto; display: flex; align-items: center; justify-content: center; }
+      .rc-ring-wrap { position: relative; width: 100%; max-width: 280px; aspect-ratio: 1 / 1; margin: 0 auto; }
       .rc-ring-wrap svg { width: 100%; height: 100%; display: block; }
       .rc-ring-center {
         position: absolute; border-radius: 50%; background: var(--rc-surface);
@@ -735,26 +742,20 @@ class AlpicairRecuperationCard extends HTMLElement {
         0%, 100% { transform: scale(1); }
         50% { transform: scale(1.03); }
       }
-      .rc-ring-center ha-icon { --mdc-icon-size: 28px; margin-bottom: 5px; transition: color var(--rc-transition); }
-      .rc-mode-name { font-size: 17px; font-weight: 700; }
+      .rc-ring-center ha-icon { --mdc-icon-size: 30px; margin-bottom: 5px; transition: color var(--rc-transition); }
+      .rc-mode-name { font-size: 18px; font-weight: 700; }
       .rc-tap-hint {
         display: flex; align-items: center; gap: 3px; font-size: 10.5px; color: var(--rc-muted);
         margin-top: 4px;
       }
       .rc-tap-hint ha-icon { --mdc-icon-size: 12px; margin: 0; color: var(--rc-muted); }
 
-      .rc-legend {
-        flex: 0 0 auto; display: flex; justify-content: center; gap: 20px; margin-top: 12px; flex-wrap: wrap;
-      }
-      .rc-legend-item { display: flex; align-items: center; gap: 7px; font-size: 13px; color: var(--rc-muted); white-space: nowrap; }
-      .rc-legend-dot { width: 9px; height: 9px; border-radius: 50%; flex: 0 0 auto; }
-      .rc-legend-value { font-weight: 700; font-variant-numeric: tabular-nums; color: var(--rc-text); }
-
       /* --- Layout: wide (Sonoff NSPanel Pro 120, portrait 9:16 screen) ---- */
       :host([data-rc-layout="wide"]) .rc-card {
         aspect-ratio: 9 / 16; max-width: 340px; width: 100%; box-sizing: border-box; padding: 18px 16px;
+        justify-content: center;
       }
-      :host([data-rc-layout="wide"]) .rc-ring-wrap { max-width: 190px; max-height: 190px; }
+      :host([data-rc-layout="wide"]) .rc-ring-wrap { max-width: 210px; }
       :host([data-rc-layout="wide"]) .rc-mode-name { font-size: 16px; }
     `;
 
@@ -771,24 +772,6 @@ class AlpicairRecuperationCard extends HTMLElement {
         </div>
       </div>
 
-      <div class="rc-ring-area">
-        <div class="rc-ring-wrap" id="rc-ring-wrap">
-          <svg viewBox="0 0 190 190">
-            <circle cx="95" cy="95" r="82" fill="none" stroke="var(--rc-surface-2)" stroke-width="12" />
-            <circle id="rc-ring-recup" cx="95" cy="95" r="82" fill="none" stroke="var(--rc-accent-warm)"
-                    stroke-width="12" stroke-linecap="round" transform="rotate(-90 95 95)" />
-            <circle cx="95" cy="95" r="63" fill="none" stroke="var(--rc-surface-2)" stroke-width="12" />
-            <circle id="rc-ring-fan" cx="95" cy="95" r="63" fill="none" stroke="var(--rc-accent-cool)"
-                    stroke-width="12" stroke-linecap="round" transform="rotate(-90 95 95)" />
-          </svg>
-          <div class="rc-ring-center" id="rc-ring-center" style="inset: 44px;" tabindex="0" role="button" aria-label="change mode">
-            <ha-icon id="rc-mode-icon" icon="mdi:power"></ha-icon>
-            <div class="rc-mode-name" id="rc-mode-name"></div>
-            <div class="rc-tap-hint"><ha-icon icon="mdi:gesture-tap"></ha-icon><span id="rc-tap-hint-text"></span></div>
-          </div>
-        </div>
-      </div>
-
       <div class="rc-legend">
         <div class="rc-legend-item">
           <span class="rc-legend-dot" style="background: var(--rc-accent-warm)"></span>
@@ -799,6 +782,24 @@ class AlpicairRecuperationCard extends HTMLElement {
           <span class="rc-legend-dot" style="background: var(--rc-accent-cool)"></span>
           <span id="rc-fan-label"></span>
           <span class="rc-legend-value" id="rc-fan-value">–</span>
+        </div>
+      </div>
+
+      <div class="rc-ring-area">
+        <div class="rc-ring-wrap" id="rc-ring-wrap">
+          <svg viewBox="0 0 190 190">
+            <circle cx="95" cy="95" r="82" fill="none" stroke="var(--rc-surface-2)" stroke-width="12" />
+            <circle id="rc-ring-recup" cx="95" cy="95" r="82" fill="none" stroke="var(--rc-accent-warm)"
+                    stroke-width="12" stroke-linecap="round" transform="rotate(-90 95 95)" />
+            <circle cx="95" cy="95" r="63" fill="none" stroke="var(--rc-surface-2)" stroke-width="12" />
+            <circle id="rc-ring-fan" cx="95" cy="95" r="63" fill="none" stroke="var(--rc-accent-cool)"
+                    stroke-width="12" stroke-linecap="round" transform="rotate(-90 95 95)" />
+          </svg>
+          <div class="rc-ring-center" id="rc-ring-center" style="inset: 20%;" tabindex="0" role="button" aria-label="change mode">
+            <ha-icon id="rc-mode-icon" icon="mdi:power"></ha-icon>
+            <div class="rc-mode-name" id="rc-mode-name"></div>
+            <div class="rc-tap-hint"><ha-icon icon="mdi:gesture-tap"></ha-icon><span id="rc-tap-hint-text"></span></div>
+          </div>
         </div>
       </div>
     `;
@@ -865,6 +866,15 @@ class AlpicairRecuperationCard extends HTMLElement {
     if (!this._hass || !this._config.mode_entity) return;
     const raw = this._config.mode_map[key];
     if (raw === undefined) return;
+    const stateObj = this._hass.states[this._config.mode_entity];
+    const options = stateObj && stateObj.attributes && stateObj.attributes.options;
+    if (Array.isArray(options) && !options.includes(raw)) {
+      console.warn(
+        `[alpicair-recuperation-card] mode_map.${key} = "${raw}" is not a valid option for ` +
+        `${this._config.mode_entity}. Valid options are: ${options.join(", ")}`
+      );
+      return;
+    }
     const [domain, service] = this._config.mode_service.split(".");
     const dataKey = this._config.mode_service_data_key;
     this._hass.callService(domain, service, {
